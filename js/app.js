@@ -1,4 +1,4 @@
-/* الواجهة: رسم اللستة، فورم الإضافة والتعديل، المسح مع التراجع */
+/* الواجهة: رسم اللستة، فورم المصروف، شاشة الفئات، المسح مع التراجع */
 (function () {
   'use strict';
 
@@ -23,6 +23,22 @@
     toast: $('#toast'),
     toastMsg: $('#toast-msg'),
     toastAction: $('#toast-action'),
+
+    openCats: $('#open-categories'),
+    catsDialog: $('#categories-dialog'),
+    catList: $('#category-list'),
+    newCatBtn: $('#new-category-btn'),
+    catDialog: $('#category-dialog'),
+    catForm: $('#category-form'),
+    catTitle: $('#category-title'),
+    catName: $('#c-name'),
+    catColors: $('#c-colors'),
+    catBuiltinNote: $('#c-builtin-note'),
+    catMove: $('#c-move'),
+    catMoveLabel: $('#c-move-label'),
+    catMoveTo: $('#c-move-to'),
+    catError: $('#c-error'),
+    catDel: $('#c-delete'),
   };
 
   const BANNERS = {
@@ -31,8 +47,19 @@
     'corrupt-nobackup': 'البيانات المتخزنة مش سليمة ومقدرناش ناخد منها نسخة، فالتعديلات مش هتتحفظ عشان منكتبش فوقها.',
   };
 
+  const SAVE_FAILED = 'مقدرناش نحفظ. ممكن تكون مساحة التخزين في المتصفح مليانة.';
+
+  const NAME_ERRORS = {
+    empty: 'الاسم مطلوب.',
+    long: 'الاسم طويل، الحد الأقصى ' + Categories.MAX_NAME + ' حرف.',
+    duplicate: 'فيه فئة بنفس الاسم ده.',
+  };
+
   let editingId = null;
   let deleteArmed = false;
+  let editingCatId = null;
+  let catDeleteArmed = false;
+  let catFromExpenseForm = false; // الفئة اتفتحت من زرار "+ فئة" جوه فورم المصروف
   let toastTimer = null;
 
   function el(tag, className, text) {
@@ -50,6 +77,17 @@
     return wrap;
   }
 
+  function badgeEl(cat, className) {
+    const b = el('span', className, Categories.badge(cat));
+    b.style.setProperty('--cat', cat.color);
+    b.setAttribute('aria-hidden', 'true');
+    return b;
+  }
+
+  function usageLabel(n) {
+    return n ? Fmt.countLabel(n) : 'مفيش مصاريف';
+  }
+
   /* ---------- الرسم ---------- */
 
   function render() {
@@ -62,6 +100,8 @@
     const groups = Expenses.groupByDay(Expenses.all());
     els.empty.hidden = groups.length > 0;
     els.list.replaceChildren(...groups.map(dayEl));
+
+    if (els.catsDialog.open) renderCategoryList();
   }
 
   function dayEl(group) {
@@ -83,15 +123,11 @@
     btn.setAttribute('aria-label',
       'تعديل: ' + cat.name + '، ' + Fmt.moneyNumber(e.amount) + ' جنيه' + (e.note ? '، ' + e.note : ''));
 
-    const icon = el('span', 'cat-icon', cat.icon);
-    icon.style.setProperty('--cat', cat.color);
-    icon.setAttribute('aria-hidden', 'true');
-
     const main = el('span', 'expense-main');
     main.append(el('span', 'expense-cat', cat.name));
     if (e.note) main.append(el('span', 'expense-note', e.note));
 
-    btn.append(icon, main, moneyEl(e.amount, 'expense-amount'));
+    btn.append(badgeEl(cat, 'cat-icon'), main, moneyEl(e.amount, 'expense-amount'));
     li.append(btn);
     return li;
   }
@@ -102,12 +138,12 @@
     els.banner.textContent = msg || '';
   }
 
-  /* ---------- الفورم ---------- */
+  /* ---------- فورم المصروف ---------- */
 
   function renderCategoryChips(selectedId) {
-    const cats = Store.categories();
+    const cats = Categories.all();
     if (!cats.some((c) => c.id === selectedId)) selectedId = 'other';
-    els.cats.replaceChildren(...cats.map((c) => {
+    const chips = cats.map((c) => {
       const label = el('label', 'chip');
       const input = document.createElement('input');
       input.type = 'radio';
@@ -116,12 +152,19 @@
       input.checked = c.id === selectedId;
       const face = el('span', 'chip-face');
       face.style.setProperty('--cat', c.color);
-      const icon = el('span', 'chip-icon', c.icon);
-      icon.setAttribute('aria-hidden', 'true');
-      face.append(icon, document.createTextNode(c.name));
+      face.append(badgeEl(c, 'chip-icon'), document.createTextNode(c.name));
       label.append(input, face);
       return label;
-    }));
+    });
+    const addChip = el('button', 'chip-add', '+ فئة');
+    addChip.type = 'button';
+    addChip.addEventListener('click', () => openCategoryForm(null, true));
+    els.cats.replaceChildren(...chips, addChip);
+  }
+
+  function selectedCategory() {
+    const checked = els.form.querySelector('input[name="category"]:checked');
+    return checked ? checked.value : 'other';
   }
 
   function openForm(expense) {
@@ -133,14 +176,14 @@
     els.note.value = expense ? expense.note : '';
     els.del.hidden = !expense;
     disarmDelete();
-    setError('');
+    setError(els.error, '');
     els.dialog.showModal();
     if (!expense) els.amount.focus();
   }
 
-  function setError(msg, field) {
-    els.error.textContent = msg;
-    [els.amount, els.date].forEach((f) => f.removeAttribute('aria-invalid'));
+  function setError(target, msg, field) {
+    target.textContent = msg;
+    target.closest('form').querySelectorAll('[aria-invalid]').forEach((f) => f.removeAttribute('aria-invalid'));
     if (field) {
       field.setAttribute('aria-invalid', 'true');
       field.focus();
@@ -157,21 +200,20 @@
     ev.preventDefault();
     const amount = Fmt.parseAmount(els.amount.value);
     if (amount === null) {
-      return setError('المبلغ لازم يكون رقم أكبر من صفر (مثلاً 150 أو 75.50).', els.amount);
+      return setError(els.error, 'المبلغ لازم يكون رقم أكبر من صفر (مثلاً 150 أو 75.50).', els.amount);
     }
     const date = els.date.value;
-    if (!Fmt.isISODate(date)) return setError('التاريخ مطلوب.', els.date);
+    if (!Fmt.isISODate(date)) return setError(els.error, 'التاريخ مطلوب.', els.date);
 
-    const checked = els.form.querySelector('input[name="category"]:checked');
     const input = {
       amount,
-      categoryId: checked ? checked.value : 'other',
+      categoryId: selectedCategory(),
       date,
       note: els.note.value.trim().slice(0, 140),
     };
     const wasEdit = editingId !== null;
     const saved = wasEdit ? Expenses.update(editingId, input) : Expenses.add(input);
-    if (!saved) return setError('مقدرناش نحفظ. ممكن تكون مساحة التخزين في المتصفح مليانة.');
+    if (!saved) return setError(els.error, SAVE_FAILED);
 
     els.dialog.close();
     render();
@@ -186,7 +228,7 @@
       return;
     }
     const removed = Expenses.remove(editingId);
-    if (!removed) return setError('حصلت مشكلة في المسح، ومقدرناش نحفظ التغيير.');
+    if (!removed) return setError(els.error, 'حصلت مشكلة في المسح، ومقدرناش نحفظ التغيير.');
     els.dialog.close();
     render();
     toast('اتمسح المصروف', {
@@ -198,6 +240,133 @@
           toast('رجع المصروف');
         } else {
           toast('مقدرناش نرجّع المصروف');
+        }
+      },
+    });
+  }
+
+  /* ---------- شاشة الفئات ---------- */
+
+  function renderCategoryList() {
+    els.catList.replaceChildren(...Categories.all().map((c) => {
+      const li = el('li');
+      const btn = el('button', 'category-row');
+      btn.type = 'button';
+      btn.dataset.id = c.id;
+      btn.setAttribute('aria-label', 'تعديل فئة ' + c.name);
+      const main = el('span', 'category-main');
+      main.append(el('span', 'category-name', c.name),
+        el('span', 'category-usage', usageLabel(Categories.usageCount(c.id))));
+      btn.append(badgeEl(c, 'cat-icon'), main);
+      if (c.builtIn) btn.append(el('span', 'tag', 'أساسية'));
+      li.append(btn);
+      return li;
+    }));
+  }
+
+  function openCategories() {
+    renderCategoryList();
+    els.catsDialog.showModal();
+  }
+
+  function renderSwatches(selected) {
+    els.catColors.replaceChildren(...Categories.PALETTE.map((p) => {
+      const label = el('label', 'swatch');
+      const input = document.createElement('input');
+      input.type = 'radio';
+      input.name = 'color';
+      input.value = p.color;
+      input.checked = p.color === selected.toUpperCase();
+      input.setAttribute('aria-label', p.name);
+      const face = el('span', 'swatch-face');
+      face.style.setProperty('--c', p.color);
+      label.append(input, face);
+      return label;
+    }));
+  }
+
+  function openCategoryForm(cat, fromExpenseForm) {
+    editingCatId = cat ? cat.id : null;
+    catFromExpenseForm = !!fromExpenseForm;
+    els.catTitle.textContent = cat ? 'تعديل فئة' : 'فئة جديدة';
+    els.catName.value = cat ? cat.name : '';
+    renderSwatches(cat ? cat.color : Categories.suggestColor());
+    els.catBuiltinNote.hidden = !(cat && cat.builtIn);
+    els.catDel.hidden = !cat || cat.builtIn;
+    disarmCatDelete();
+    setError(els.catError, '');
+    els.catDialog.showModal();
+    if (!cat) els.catName.focus();
+  }
+
+  function disarmCatDelete() {
+    catDeleteArmed = false;
+    els.catDel.textContent = 'مسح';
+    els.catDel.classList.remove('armed');
+    els.catMove.hidden = true;
+  }
+
+  function onCategorySubmit(ev) {
+    ev.preventDefault();
+    const nameError = Categories.validateName(els.catName.value, editingCatId);
+    if (nameError) return setError(els.catError, NAME_ERRORS[nameError], els.catName);
+    const checked = els.catForm.querySelector('input[name="color"]:checked');
+    const input = { name: els.catName.value, color: checked ? checked.value : Categories.suggestColor() };
+
+    const wasEdit = editingCatId !== null;
+    const saved = wasEdit ? Categories.update(editingCatId, input) : Categories.add(input);
+    if (!saved) return setError(els.catError, SAVE_FAILED);
+
+    els.catDialog.close();
+    if (catFromExpenseForm && els.dialog.open) {
+      // نرجع لفورم المصروف والفئة الجديدة متختارة
+      renderCategoryChips(saved.id);
+    } else if (els.dialog.open) {
+      renderCategoryChips(selectedCategory());
+    }
+    render();
+    toast(wasEdit ? 'اتعدّلت الفئة' : 'اتضافت الفئة');
+  }
+
+  function onCategoryDelete() {
+    const id = editingCatId;
+    if (!catDeleteArmed) {
+      catDeleteArmed = true;
+      els.catDel.textContent = 'تأكيد المسح';
+      els.catDel.classList.add('armed');
+      const n = Categories.usageCount(id);
+      if (n) {
+        els.catMoveLabel.textContent = 'فيه ' + Fmt.countLabel(n) + ' على الفئة دي. هتتنقل لـ:';
+        els.catMoveTo.replaceChildren(...Categories.all().filter((c) => c.id !== id).map((c) => {
+          const o = el('option', '', c.name);
+          o.value = c.id;
+          o.selected = c.id === 'other';
+          return o;
+        }));
+        els.catMove.hidden = false;
+      }
+      return;
+    }
+
+    const moveTo = els.catMove.hidden ? 'other' : els.catMoveTo.value;
+    const snap = Categories.remove(id, moveTo);
+    if (!snap) return setError(els.catError, 'حصلت مشكلة في المسح، ومقدرناش نحفظ التغيير.');
+    els.catDialog.close();
+    render();
+
+    const target = Store.category(snap.movedTo);
+    const msg = snap.movedIds.length
+      ? 'اتمسحت الفئة، ومصاريفها اتنقلت لـ«' + target.name + '»'
+      : 'اتمسحت الفئة';
+    toast(msg, {
+      action: 'تراجع',
+      duration: 5000,
+      onAction: () => {
+        if (Categories.restore(snap)) {
+          render();
+          toast('رجعت الفئة');
+        } else {
+          toast('مقدرناش نرجّع الفئة');
         }
       },
     });
@@ -225,6 +394,8 @@
   /* ---------- الأحداث ---------- */
 
   els.addBtn.addEventListener('click', () => openForm(null));
+  els.openCats.addEventListener('click', openCategories);
+  els.newCatBtn.addEventListener('click', () => openCategoryForm(null, false));
 
   els.list.addEventListener('click', (ev) => {
     const btn = ev.target.closest('button.expense');
@@ -233,18 +404,35 @@
     if (e) openForm(e);
   });
 
+  els.catList.addEventListener('click', (ev) => {
+    const btn = ev.target.closest('button.category-row');
+    if (!btn) return;
+    const c = Categories.find(btn.dataset.id);
+    if (c) openCategoryForm(c, false);
+  });
+
   els.form.addEventListener('submit', onSubmit);
   els.del.addEventListener('click', onDelete);
-  els.form.querySelector('[data-close]').addEventListener('click', () => els.dialog.close());
+  els.catForm.addEventListener('submit', onCategorySubmit);
+  els.catDel.addEventListener('click', onCategoryDelete);
 
-  // الضغط على الخلفية بيقفل الفورم
-  els.dialog.addEventListener('click', (ev) => {
-    if (ev.target === els.dialog) els.dialog.close();
+  // زرار ✕ والضغط على الخلفية بيقفلوا أي dialog
+  document.querySelectorAll('.sheet-dialog').forEach((d) => {
+    d.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', () => d.close()));
+    d.addEventListener('click', (ev) => {
+      if (ev.target === d) d.close();
+    });
   });
 
   els.dialog.addEventListener('close', () => {
     editingId = null;
     disarmDelete();
+  });
+
+  els.catDialog.addEventListener('close', () => {
+    editingCatId = null;
+    catFromExpenseForm = false;
+    disarmCatDelete();
   });
 
   // لو التطبيق مفتوح في تابين، التاني يتحدث لوحده

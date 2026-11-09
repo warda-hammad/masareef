@@ -35,12 +35,21 @@ const Store = (function () {
       && typeof e.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(e.date);
   }
 
+  function isValidCategory(c) {
+    return c && typeof c.id === 'string' && c.id
+      && typeof c.name === 'string' && c.name.trim()
+      && typeof c.color === 'string' && /^#[0-9a-f]{6}$/i.test(c.color);
+  }
+
   // v1 هي أول نسخة؛ أي تغيير في شكل الداتا بعد كده هيتحول هنا
   function migrate(data) {
     const s = freshState();
     if (!data || typeof data !== 'object') return s;
     if (Array.isArray(data.expenses)) s.expenses = data.expenses.filter(isValidExpense);
-    if (Array.isArray(data.categories) && data.categories.length) s.categories = data.categories;
+    if (Array.isArray(data.categories)) {
+      const cats = data.categories.filter(isValidCategory);
+      if (cats.length) s.categories = cats;
+    }
     DEFAULT_CATEGORIES.forEach((d) => {
       if (!s.categories.some((c) => c.id === d.id)) s.categories.push(Object.assign({}, d));
     });
@@ -89,6 +98,19 @@ const Store = (function () {
     }
   }
 
+  // بيطبّق التغيير ويحفظ، ولو الحفظ فشل بيرجّع اللي اتغير
+  function commit(apply, revert) {
+    apply();
+    if (save()) return true;
+    revert();
+    return false;
+  }
+
+  function newId() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+  }
+
   function categories() {
     return state.categories;
   }
@@ -102,6 +124,8 @@ const Store = (function () {
     KEY,
     load,
     save,
+    commit,
+    newId,
     state: () => state,
     categories,
     category,

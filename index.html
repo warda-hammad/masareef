@@ -14,7 +14,12 @@
 
   <main class="app">
     <header class="app-header">
-      <p class="brand"><span class="brand-dot" aria-hidden="true"></span>مصاريفي</p>
+      <div class="top-bar">
+        <p class="brand"><span class="brand-dot" aria-hidden="true"></span>مصاريفي</p>
+        <button id="open-categories" class="ghost-btn" type="button">
+          <span aria-hidden="true">🏷️</span> الفئات
+        </button>
+      </div>
       <section class="month-card" aria-labelledby="month-label">
         <h1 id="month-label" class="month-label">إجمالي الشهر</h1>
         <p id="month-total" class="month-total"></p>
@@ -86,9 +91,57 @@
     </form>
   </dialog>
 
+  <dialog id="categories-dialog" class="sheet-dialog" aria-labelledby="categories-title">
+    <div class="sheet">
+      <div class="sheet-head">
+        <h2 id="categories-title">الفئات</h2>
+        <button type="button" class="icon-btn" data-close aria-label="قفل">✕</button>
+      </div>
+      <ul id="category-list" class="category-list"></ul>
+      <button type="button" id="new-category-btn" class="btn btn-secondary">+ فئة جديدة</button>
+    </div>
+  </dialog>
+
+  <dialog id="category-dialog" class="sheet-dialog" aria-labelledby="category-title">
+    <form id="category-form" class="sheet" novalidate>
+      <div class="sheet-head">
+        <h2 id="category-title">فئة جديدة</h2>
+        <button type="button" class="icon-btn" data-close aria-label="قفل">✕</button>
+      </div>
+
+      <label class="field" for="c-name">
+        <span class="field-label">الاسم</span>
+        <input id="c-name" name="name" type="text" class="input" maxlength="24"
+               placeholder="مثلاً: جيم" autocomplete="off" required>
+      </label>
+
+      <fieldset class="field">
+        <legend class="field-label">اللون</legend>
+        <div id="c-colors" class="swatches"></div>
+      </fieldset>
+
+      <p id="c-builtin-note" class="hint" hidden>
+        دي فئة أساسية: ينفع اسمها ولونها يتغيروا، بس مينفعش تتمسح.
+      </p>
+
+      <div id="c-move" class="field move-box" hidden>
+        <label id="c-move-label" class="field-label" for="c-move-to"></label>
+        <select id="c-move-to" class="input"></select>
+      </div>
+
+      <p id="c-error" class="form-error" role="alert"></p>
+
+      <div class="sheet-actions">
+        <button type="submit" class="btn btn-primary">حفظ</button>
+        <button type="button" id="c-delete" class="btn btn-danger" hidden>مسح</button>
+      </div>
+    </form>
+  </dialog>
+
   <script src="js/storage.js"></script>
   <script src="js/format.js"></script>
   <script src="js/expenses.js"></script>
+  <script src="js/categories.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

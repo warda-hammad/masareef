@@ -2,10 +2,7 @@
 const Expenses = (function () {
   'use strict';
 
-  function newId() {
-    if (window.crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
-    return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
-  }
+  const commit = (apply, revert) => Store.commit(apply, revert);
 
   function all() {
     return Store.state().expenses;
@@ -13,13 +10,6 @@ const Expenses = (function () {
 
   function find(id) {
     return all().find((e) => e.id === id) || null;
-  }
-
-  function commit(apply, revert) {
-    apply();
-    if (Store.save()) return true;
-    revert();
-    return false;
   }
 
   function fields(input) {
@@ -33,7 +23,7 @@ const Expenses = (function () {
 
   function add(input) {
     const now = Date.now();
-    const e = Object.assign({ id: newId() }, fields(input), { createdAt: now, updatedAt: now });
+    const e = Object.assign({ id: Store.newId() }, fields(input), { createdAt: now, updatedAt: now });
     const list = all();
     return commit(() => list.push(e), () => list.splice(list.indexOf(e), 1)) ? e : null;
   }
@@ -53,10 +43,8 @@ const Expenses = (function () {
     const list = all();
     const i = list.findIndex((e) => e.id === id);
     if (i < 0) return null;
-    const [e] = list.splice(i, 1);
-    if (Store.save()) return e;
-    list.splice(i, 0, e);
-    return null;
+    const e = list[i];
+    return commit(() => list.splice(i, 1), () => list.splice(i, 0, e)) ? e : null;
   }
 
   // للتراجع بعد المسح
@@ -76,7 +64,8 @@ const Expenses = (function () {
 
   function lastUsedCategory() {
     let last = null;
-    all().forEach((e) => { if (!last || e.createdAt > last.createdAt) last = e; });
+    // >= عشان لو اتنين اتضافوا في نفس الـ millisecond، الأحدث في اللستة يكسب
+    all().forEach((e) => { if (!last || e.createdAt >= last.createdAt) last = e; });
     return last ? last.categoryId : 'food';
   }
 
