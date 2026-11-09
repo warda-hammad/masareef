@@ -7,6 +7,11 @@
   <meta name="description" content="تطبيق بسيط لتسجيل المصاريف بالجنيه المصري. البيانات بتفضل على الجهاز بس.">
   <meta name="theme-color" content="#14121C">
   <meta name="color-scheme" content="dark">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="icon" href="icons/icon-192.png" type="image/png" sizes="192x192">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-title" content="مصاريفي">
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
@@ -148,6 +153,12 @@
       </div>
       <ol id="expense-list" class="days"></ol>
     </section>
+
+    <div class="install">
+      <button id="install-btn" class="btn btn-secondary" type="button" hidden>📲 تثبيت التطبيق على الجهاز</button>
+      <p id="ios-hint" class="hint" hidden>للتثبيت على الآيفون: زرار المشاركة <span aria-hidden="true">⬆️</span> وبعدين «إضافة إلى الشاشة الرئيسية».</p>
+      <p id="offline-note" class="hint" hidden>التطبيق متخزن على الجهاز، وبيشتغل من غير إنترنت.</p>
+    </div>
 
     <footer class="privacy">
       <p><span aria-hidden="true">🔒</span> بياناتك متخزنة على الجهاز ده بس، جوه المتصفح. مفيش سيرفر، ومفيش أي حاجة بتطلع من جهازك.</p>

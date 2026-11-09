@@ -9,8 +9,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Running
 
 - Open `index.html` directly (`file://`). This has to keep working.
-- Or serve the folder: `python -m http.server`. Once the PWA/service-worker step lands, this is required, because service workers need localhost or HTTPS.
+- Or serve the folder: `python -m http.server`. Testing the PWA (service worker, install, offline) needs this, because service workers only run on localhost or HTTPS. On `file://`, `app.js` skips registration.
 - There is no build or lint tooling and no `package.json`.
+
+## Service worker VERSION (do this after every change)
+
+`sw.js` is cache-first, and its `VERSION` is a content hash of every file in `ASSETS`. After editing any cached file (HTML, CSS, JS, fonts, icons, manifest), run:
+
+    node tests/helpers/sw-version.js --write
+
+Otherwise installed users keep the old files, and the `VERSION` test in `tests/pwa.test.js` fails. A new JS/CSS/font/icon file must also be added to `ASSETS`. The tests check that everything `index.html`, `styles.css` and the manifest reference is in the list, and that every `js/*.js` is.
 
 ## Tests
 
@@ -54,6 +62,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
     - dates as `YYYY-MM-DD` or day-first `D/M/YYYY`
     - amounts with `ج.م` or with thousands separators
   - Category names match existing ones through `Filters.normalize`. Unknown names become new palette-colored categories.
+- **PWA.**
+  - `manifest.webmanifest` uses relative `start_url`/`scope` (`./`), so the site also works from a sub-folder (for example on GitHub Pages).
+  - The SW install caches files one by one, not with `addAll`. Python's `http.server` has a listen backlog of 5 and refuses a burst of parallel requests, which made `addAll` fail the whole install.
+  - Navigations always get the cached `index.html`.
+  - Updates: a new SW waits, `app.js` shows a «تحديث» toast, the page posts `skip-waiting`, and it reloads on `controllerchange`. The reload happens only when the person asked for the update, never on the first install.
+  - The `#add` hash (the manifest shortcut) opens the new-expense form.
+  - Icons are SVG shapes only, no text, rendered to PNG with headless Chrome. The maskable version keeps its content inside the safe zone.
+  - When testing in headless Chrome on Windows, use a short `--user-data-dir` path. A deep path breaks CacheStorage (`Unexpected internal error`) because of MAX_PATH.
 - **Dates are local `YYYY-MM-DD` strings.** Never use `new Date('YYYY-MM-DD')`, because it parses as UTC. Use the `Fmt` helpers.
 - **Categories.**
   - The built-in categories have stable ids (`food`, `transport`, `bills`, `rent`, `health`, `outings`, `other`) and `builtIn: true`. They can be renamed and recolored but never deleted.
@@ -82,7 +98,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 4. Dashboard with charts (done)
 5. Search and filters (done)
 6. CSV export and import (done)
-7. PWA: `manifest.webmanifest`, icons, cache-first `sw.js`
+7. PWA (done)
 8. Accessibility pass, privacy page, "delete all my data", deploy README
 
 Before publishing, add JetBrains Mono's OFL license to `fonts/`. Only Alexandria's is there now.

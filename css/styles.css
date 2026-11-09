@@ -765,6 +765,15 @@ button { cursor: pointer; }
 .empty-icon { font-size: 2.5rem; margin-bottom: 8px; }
 .empty-hint { color: var(--muted); font-size: 0.9rem; margin-top: 4px; }
 
+.install {
+  display: grid;
+  gap: 8px;
+  margin-top: 32px;
+  text-align: center;
+}
+
+.install .hint { margin: 0; }
+
 .privacy {
   margin-top: 40px;
   padding: 16px;

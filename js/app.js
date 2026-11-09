@@ -103,6 +103,10 @@
     impWarning: $('#imp-warning'),
     impError: $('#imp-error'),
     impConfirm: $('#imp-confirm'),
+
+    installBtn: $('#install-btn'),
+    iosHint: $('#ios-hint'),
+    offlineNote: $('#offline-note'),
   };
 
   const BANNERS = {
@@ -125,6 +129,8 @@
   let catDeleteArmed = false;
   let catFromExpenseForm = false; // الفئة اتفتحت من زرار "+ فئة" جوه فورم المصروف
   let toastTimer = null;
+  // اختصار "مصروف جديد" من أيقونة التطبيق (manifest shortcuts → ./#add). بنقراه قبل ما syncHash يغير الرابط
+  const openAddOnLoad = location.hash === '#add';
   let view = location.hash === '#dashboard' ? 'dash' : 'list';
   let filter = view === 'list' ? Filters.parse(location.hash) : Filters.clean();
   let dashMonth = Fmt.currentMonth();
@@ -818,6 +824,76 @@
     });
   }
 
+  /* ---------- PWA: التثبيت والعمل من غير نت والتحديث ---------- */
+
+  let installPrompt = null;
+  let updateRequested = false;
+
+  function isStandalone() {
+    return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  }
+
+  // الآيفون مفيهوش زرار تثبيت، فبنشرح الطريقة بالإيد
+  function isIOS() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent)
+      || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
+
+  function setupInstall() {
+    els.iosHint.hidden = !(isIOS() && !isStandalone());
+
+    window.addEventListener('beforeinstallprompt', (ev) => {
+      ev.preventDefault();
+      installPrompt = ev;
+      els.installBtn.hidden = false;
+    });
+    els.installBtn.addEventListener('click', () => {
+      if (!installPrompt) return;
+      installPrompt.prompt();
+      installPrompt.userChoice.finally(() => {
+        installPrompt = null;
+        els.installBtn.hidden = true;
+      });
+    });
+    window.addEventListener('appinstalled', () => {
+      els.installBtn.hidden = true;
+      toast('اتثبت التطبيق على الجهاز');
+    });
+  }
+
+  // service worker بيشتغل على https أو localhost بس، مش من file://
+  function registerServiceWorker() {
+    if (!('serviceWorker' in navigator) || location.protocol === 'file:') return;
+
+    // بنعمل reload بس لو اليوزر دوس "تحديث"، مش أول مرة الـ SW يمسك الصفحة
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (updateRequested) location.reload();
+    });
+
+    navigator.serviceWorker.register('sw.js').then((reg) => {
+      const offer = (worker) => toast('فيه نسخة جديدة من التطبيق', {
+        action: 'تحديث',
+        duration: 15000,
+        onAction: () => {
+          updateRequested = true;
+          worker.postMessage('skip-waiting');
+        },
+      });
+      if (reg.waiting && navigator.serviceWorker.controller) offer(reg.waiting);
+      reg.addEventListener('updatefound', () => {
+        const worker = reg.installing;
+        if (!worker) return;
+        worker.addEventListener('statechange', () => {
+          if (worker.state === 'installed' && navigator.serviceWorker.controller) offer(worker);
+          if (worker.state === 'activated') els.offlineNote.hidden = false;
+        });
+      });
+      if (reg.active) els.offlineNote.hidden = false;
+    }).catch(() => {
+      // من غير SW التطبيق بيشتغل عادي، بس محتاج نت أول ما يتفتح
+    });
+  }
+
   /* ---------- التوست ---------- */
 
   // tone: 'warn' أو 'over' لتوست التحذير
@@ -898,6 +974,10 @@
   // لو الرابط اتغير بإيد اليوزر أو بزرار الرجوع
   window.addEventListener('hashchange', () => {
     if (location.hash === '#dashboard') return setView('dash');
+    if (location.hash === '#add') {
+      syncHash();
+      return openForm(null);
+    }
     filter = Filters.parse(location.hash);
     if (view !== 'list') setView('list');
     else renderList();
@@ -945,4 +1025,7 @@
   renderBanner();
   setView(view);
   render();
+  setupInstall();
+  registerServiceWorker();
+  if (openAddOnLoad) openForm(null);
 })();
