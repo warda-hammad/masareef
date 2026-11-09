@@ -98,6 +98,26 @@ const Store = (function () {
     }
   }
 
+  // "مسح كل بياناتي": بيشيل مفتاح التطبيق وكل النسخ الاحتياطية بتاعته (masareef.v1.*)
+  // ومبيلمسش أي مفاتيح تانية. بيرجع false لو التخزين رفض المسح
+  function clearAll() {
+    try {
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k === KEY || k.startsWith(KEY + '.')) keys.push(k);
+      }
+      keys.forEach((k) => localStorage.removeItem(k));
+      persist = true;
+      error = null;
+    } catch (e) {
+      // التخزين مقفول من الأول: الداتا كانت في الذاكرة بس، فكفاية نصفّرها
+      if (error !== 'unavailable') return false;
+    }
+    state = freshState();
+    return true;
+  }
+
   // بيطبّق التغيير ويحفظ، ولو الحفظ فشل بيرجّع اللي اتغير
   function commit(apply, revert) {
     apply();
@@ -124,6 +144,7 @@ const Store = (function () {
     KEY,
     load,
     save,
+    clearAll,
     commit,
     newId,
     state: () => state,

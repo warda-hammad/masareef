@@ -2,6 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>مصاريفي</title>
   <meta name="description" content="تطبيق بسيط لتسجيل المصاريف بالجنيه المصري. البيانات بتفضل على الجهاز بس.">
@@ -20,7 +21,7 @@
   <main class="app">
     <header class="app-header">
       <div class="top-bar">
-        <p class="brand"><span class="brand-dot" aria-hidden="true"></span>مصاريفي</p>
+        <h1 class="brand"><span class="brand-dot" aria-hidden="true"></span>مصاريفي</h1>
         <div class="top-actions">
           <button id="open-categories" class="ghost-btn" type="button">
             <span aria-hidden="true">🏷️</span> الفئات
@@ -31,7 +32,7 @@
         </div>
       </div>
       <section class="month-card" aria-labelledby="month-label">
-        <h1 id="month-label" class="month-label">إجمالي الشهر</h1>
+        <h2 id="month-label" class="month-label">إجمالي الشهر</h2>
         <p id="month-total" class="month-total"></p>
         <p id="month-count" class="month-count"></p>
 
@@ -163,6 +164,7 @@
     <footer class="privacy">
       <p><span aria-hidden="true">🔒</span> بياناتك متخزنة على الجهاز ده بس، جوه المتصفح. مفيش سيرفر، ومفيش أي حاجة بتطلع من جهازك.</p>
       <p class="privacy-note">خلي بالك: مسح بيانات المتصفح بيمسح المصاريف كمان.</p>
+      <p class="privacy-note"><a href="privacy.html">تفاصيل الخصوصية</a></p>
     </footer>
   </main>
 
@@ -313,7 +315,37 @@
       </details>
 
       <p id="data-error" class="form-error" role="alert"></p>
+
+      <div class="danger-zone">
+        <p class="hint">مسح كل المصاريف والفئات والميزانية من الجهاز ده. مفيش رجوع بعدها.</p>
+        <button id="wipe-open" type="button" class="btn btn-danger">🗑️ مسح كل البيانات</button>
+      </div>
     </div>
+  </dialog>
+
+  <dialog id="wipe-dialog" class="sheet-dialog" aria-labelledby="wipe-title">
+    <form id="wipe-form" class="sheet" novalidate>
+      <div class="sheet-head">
+        <h2 id="wipe-title">مسح كل البيانات</h2>
+        <button type="button" class="icon-btn" data-close aria-label="قفل">✕</button>
+      </div>
+
+      <p id="wipe-summary" class="warn-box"></p>
+
+      <button id="wipe-export" type="button" class="btn btn-secondary">⬇️ تصدير نسخة احتياطية الأول</button>
+
+      <label class="field" for="wipe-confirm">
+        <span class="field-label">للتأكيد، الكلمة «امسح» في الخانة دي</span>
+        <input id="wipe-confirm" type="text" class="input" autocomplete="off" placeholder="امسح"
+               aria-describedby="wipe-error">
+      </label>
+
+      <p id="wipe-error" class="form-error" role="alert"></p>
+
+      <div class="sheet-actions">
+        <button type="submit" id="wipe-submit" class="btn btn-danger" disabled>مسح كل البيانات نهائي</button>
+      </div>
+    </form>
   </dialog>
 
   <dialog id="import-dialog" class="sheet-dialog" aria-labelledby="import-title">

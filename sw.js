@@ -1,12 +1,13 @@
 /* Service worker: بيخزّن كل ملفات التطبيق عشان يشتغل من غير نت (cache-first).
    VERSION = hash لمحتوى الملفات. بعد أي تعديل في ملف من ASSETS:
-   node tests/helpers/sw-version.js --write */
-const VERSION = 'v-fd41d24e12';
+   node scripts/sw-version.js --write */
+const VERSION = 'v-b0620954cf';
 const CACHE = 'masareef-' + VERSION;
 
 const ASSETS = [
   './',
   'index.html',
+  'privacy.html',
   'manifest.webmanifest',
   'css/styles.css',
   'js/storage.js',
@@ -57,9 +58,12 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
   if (new URL(req.url).origin !== self.location.origin) return;
 
-  // أي فتح للصفحة (حتى لو فيها #dashboard أو ?x) بيرجع index.html من الكاش
+  // فتح صفحة: الصفحة نفسها من الكاش (index.html أو privacy.html، حتى لو فيها ?x)،
+  // ولو مش متخزنة نرجع index.html عشان التطبيق يفتح من غير نت
   if (req.mode === 'navigate') {
-    event.respondWith(caches.match('index.html').then((hit) => hit || fetch(req)));
+    event.respondWith(caches.match(req, { ignoreSearch: true })
+      .then((hit) => hit || caches.match('index.html'))
+      .then((hit) => hit || fetch(req)));
     return;
   }
   event.respondWith(caches.match(req, { ignoreSearch: true }).then((hit) => hit || fetch(req)));

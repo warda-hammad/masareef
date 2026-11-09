@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { ROOT, readSw, computeVersion } = require('./helpers/sw-version');
+const { ROOT, readSw, computeVersion } = require('../scripts/sw-version');
 
 const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
 const exists = (f) => fs.existsSync(path.join(ROOT, f));
@@ -84,7 +84,7 @@ test('ASSETS: فيها كل ملفات js والخطوط وأيقونات الـ
 test('VERSION في sw.js متحدّث مع محتوى الملفات', () => {
   const expected = computeVersion(ASSETS);
   assert.equal(VERSION, expected,
-    'ملفات اتغيرت والـ VERSION زي ما هو. شغّلي: node tests/helpers/sw-version.js --write');
+    'ملفات اتغيرت والـ VERSION زي ما هو. شغّلي: node scripts/sw-version.js --write');
 });
 
 /* ---------- سلوك الـ service worker ---------- */
@@ -172,12 +172,21 @@ test('fetch: الملف المتخزن بيرجع من الكاش من غير ن
   assert.equal(sw.calls.fetch.length, 0);
 });
 
-test('fetch: فتح الصفحة بأي رابط بيرجع index.html من الكاش', async () => {
+test('fetch: فتح أي صفحة بيرجعها من الكاش، حتى لو فيها ?query', async () => {
   const sw = loadSw();
   await sw.waitFor('install');
-  for (const url of [BASE, BASE + 'index.html', BASE + '?utm=x']) {
-    assert.equal(await sw.request(url, { mode: 'navigate' }), 'cached:' + BASE + 'index.html', url);
-  }
+  const nav = (url) => sw.request(url, { mode: 'navigate' });
+  assert.equal(await nav(BASE), 'cached:' + BASE);
+  assert.equal(await nav(BASE + '?utm=x'), 'cached:' + BASE);
+  assert.equal(await nav(BASE + 'index.html'), 'cached:' + BASE + 'index.html');
+  assert.equal(await nav(BASE + 'privacy.html'), 'cached:' + BASE + 'privacy.html', 'مش index.html');
+  assert.equal(sw.calls.fetch.length, 0);
+});
+
+test('fetch: صفحة مش متخزنة بترجع index.html عشان التطبيق يفتح من غير نت', async () => {
+  const sw = loadSw();
+  await sw.waitFor('install');
+  assert.equal(await sw.request(BASE + 'old-link', { mode: 'navigate' }), 'cached:' + BASE + 'index.html');
   assert.equal(sw.calls.fetch.length, 0);
 });
 

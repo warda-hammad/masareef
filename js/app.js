@@ -104,6 +104,15 @@
     impError: $('#imp-error'),
     impConfirm: $('#imp-confirm'),
 
+    wipeOpen: $('#wipe-open'),
+    wipeDialog: $('#wipe-dialog'),
+    wipeForm: $('#wipe-form'),
+    wipeSummary: $('#wipe-summary'),
+    wipeExport: $('#wipe-export'),
+    wipeConfirm: $('#wipe-confirm'),
+    wipeError: $('#wipe-error'),
+    wipeSubmit: $('#wipe-submit'),
+
     installBtn: $('#install-btn'),
     iosHint: $('#ios-hint'),
     offlineNote: $('#offline-note'),
@@ -423,6 +432,8 @@
     target.closest('form').querySelectorAll('[aria-invalid]').forEach((f) => f.removeAttribute('aria-invalid'));
     if (field) {
       field.setAttribute('aria-invalid', 'true');
+      // قارئ الشاشة يقرا رسالة الغلط مع الخانة
+      field.setAttribute('aria-describedby', target.id);
       field.focus();
     }
   }
@@ -824,6 +835,44 @@
     });
   }
 
+  /* ---------- مسح كل البيانات ---------- */
+
+  const WIPE_WORD = 'امسح';
+
+  function openWipe() {
+    const state = Store.state();
+    const custom = state.categories.filter((c) => !c.builtIn).length;
+    const parts = [state.expenses.length ? Fmt.countLabel(state.expenses.length) : 'مفيش مصاريف'];
+    if (custom) parts.push(custom === 1 ? 'فئة مخصصة' : custom === 2 ? 'فئتين مخصصين' : custom + ' فئات مخصصة');
+    if (Budget.get()) parts.push('الميزانية الشهرية');
+    els.wipeSummary.textContent = '⚠️ هيتمسح من الجهاز ده: ' + parts.join('، ')
+      + '، وأي تعديل على الفئات الأساسية. مفيش رجوع بعد كده.';
+    els.wipeExport.hidden = state.expenses.length === 0;
+    els.wipeConfirm.value = '';
+    els.wipeSubmit.disabled = true;
+    els.wipeError.textContent = '';
+    els.dataDialog.close();
+    els.wipeDialog.showModal();
+    els.wipeConfirm.focus();
+  }
+
+  function onWipe(ev) {
+    ev.preventDefault();
+    if (Filters.normalize(els.wipeConfirm.value) !== Filters.normalize(WIPE_WORD)) return;
+    if (!Store.clearAll()) {
+      els.wipeError.textContent = 'المتصفح رفض المسح. المسح ممكن كمان من إعدادات المتصفح: «مسح بيانات الموقع».';
+      return;
+    }
+    filter = Filters.clean();
+    dashMonth = Fmt.currentMonth();
+    els.fltQ.value = '';
+    els.wipeDialog.close();
+    syncHash();
+    renderBanner();
+    render();
+    toast('اتمسحت كل البيانات من الجهاز ده');
+  }
+
   /* ---------- PWA: التثبيت والعمل من غير نت والتحديث ---------- */
 
   let installPrompt = null;
@@ -952,6 +1001,12 @@
   });
   els.importForm.addEventListener('submit', onImportConfirm);
   els.importDialog.addEventListener('close', () => { pendingImport = null; });
+  els.wipeOpen.addEventListener('click', openWipe);
+  els.wipeExport.addEventListener('click', onExport);
+  els.wipeConfirm.addEventListener('input', () => {
+    els.wipeSubmit.disabled = Filters.normalize(els.wipeConfirm.value) !== Filters.normalize(WIPE_WORD);
+  });
+  els.wipeForm.addEventListener('submit', onWipe);
 
   els.tabList.addEventListener('click', () => setView('list'));
   els.tabDash.addEventListener('click', () => setView('dash'));

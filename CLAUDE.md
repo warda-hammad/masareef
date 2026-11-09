@@ -10,13 +10,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - Open `index.html` directly (`file://`). This has to keep working.
 - Or serve the folder: `python -m http.server`. Testing the PWA (service worker, install, offline) needs this, because service workers only run on localhost or HTTPS. On `file://`, `app.js` skips registration.
-- There is no build or lint tooling and no `package.json`.
+- There is no build or lint tooling and no `package.json`. `scripts/` holds two small Node helpers: `sw-version.js` (below) and `build-site.js`. `build-site.js` copies the deployable files (sw.js `ASSETS` + `sw.js` + font licenses) into `_site/`, which is gitignored. It refuses to run when `VERSION` is stale, and only accepts a simple folder name directly inside the repo, because it deletes that folder first.
+
+## Deploy (prepared, never run from here)
+
+- `.github/workflows/pages.yml` runs `node --test`, builds `_site`, and publishes to GitHub Pages on push to `main`. The local branch is `master`.
+- `netlify.toml` does the same build, plus headers: full CSP with `frame-ancestors`, `nosniff`, `no-referrer`, and `no-cache` for `sw.js`.
+- Pushing, publishing and creating accounts are the owner's decision. Never do them unasked.
 
 ## Service worker VERSION (do this after every change)
 
 `sw.js` is cache-first, and its `VERSION` is a content hash of every file in `ASSETS`. After editing any cached file (HTML, CSS, JS, fonts, icons, manifest), run:
 
-    node tests/helpers/sw-version.js --write
+    node scripts/sw-version.js --write
 
 Otherwise installed users keep the old files, and the `VERSION` test in `tests/pwa.test.js` fails. A new JS/CSS/font/icon file must also be added to `ASSETS`. The tests check that everything `index.html`, `styles.css` and the manifest reference is in the list, and that every `js/*.js` is.
 
@@ -34,6 +40,7 @@ Otherwise installed users keep the old files, and the `VERSION` test in `tests/p
 - **Classic scripts, no ES modules.** Modules break under `file://`. `index.html` loads the scripts in dependency order: `storage.js` → `format.js` → `expenses.js` → `categories.js` → `budget.js` → `stats.js` → `filters.js` → `csv.js` → `dom.js` → `charts.js` → `app.js`. Each file before `app.js` defines one global object (`Store`, `Fmt`, `Expenses`, `Categories`, `Budget`, `Stats`, `Filters`, `Csv`, `Dom`, `Charts`) via an IIFE. The first eight are DOM-free logic and are what the tests load. `dom.js` (shared `el`/`moneyEl`/`badgeEl`), `charts.js` and `app.js` are the DOM layer. New modules follow the same pattern and must be added to the script list in order.
 - **Single state object.** `Store` holds `{version, expenses[], categories[], settings{}}` under the key `masareef.v1`. Shape changes go through `migrate()` in `storage.js`, and `VERSION` gets bumped. Corrupt JSON is copied to `masareef.v1.corrupt.<ts>` instead of being overwritten. If that copy fails, or storage is unavailable, `persist` goes false: the app runs memory-only and shows a banner. `Store.error()` drives that banner.
 - **Mutate-then-save with rollback.** Every write goes through `Store.commit(apply, revert)`: it applies the change in memory, saves, and runs `revert` if the save fails (for example on quota errors). Writes return `null`/`false` on failure so the UI can show an error. New data operations (like CSV import) should use `Store.commit` too. IDs come from `Store.newId()`.
+- **Wipe.** `Store.clearAll()` removes `masareef.v1` and every `masareef.v1.*` backup, and nothing else. The UI requires typing «امسح» (compared via `Filters.normalize`) and offers an export first. There is no undo, by design.
 - **Undo via snapshots.** `Expenses.remove` returns the removed expense, `Categories.remove` returns `{category, index, movedIds, movedTo}`, and clearing the budget keeps the old amount for `Budget.set`. The UI passes that back to `restore()` from the toast's «تراجع» button.
 - **Rendering.** `render()` in `app.js` rebuilds the header and the list from state after every change. User-provided text (notes, category names) must only reach the DOM through `textContent`/`createElement`, never `innerHTML`.
 - **Money is integer piasters** (`amount: 15000` = 150 ج.م). Parse with `Fmt.parseAmount` (accepts Arabic-Indic digits, `٫`, thousands separators) and display with `Fmt.moneyNumber`. Wrap displayed amounts in an `dir="ltr"` `.num` span (`moneyEl()` in `app.js`).
@@ -85,9 +92,17 @@ Otherwise installed users keep the old files, and the `VERSION` test in `tests/p
 
 ## Conventions
 
+- **CSP.** Every HTML page has the same `<meta http-equiv="Content-Security-Policy">` (`'self'` only). It must stay identical to the Netlify header minus `frame-ancestors`, and `tests/deploy.test.js` checks that. So there are no inline `<script>`/`<style>`, no `style=""` attributes, no `on*=` handlers, and no external URLs. Setting styles from JS (`el.style.setProperty`) is allowed. It works on `file://` too, which was verified in Chrome.
+- **Pages.** `index.html` (the app) and `privacy.html` (a static explanation of what is stored, where, and how to delete it). A new page must be added to `ASSETS` and to `HTML_PAGES` in `tests/deploy.test.js`.
+
 - **Digits are always Latin (0-9).** The number font, JetBrains Mono, has no Arabic-Indic glyphs. `Intl` date formatters use `ar-EG-u-nu-latn`.
 - **UI copy is Egyptian colloquial Arabic, phrased gender-neutrally.** Use nouns ("حفظ", "مسح", "تأكيد المسح") or impersonal phrasing, not gendered imperatives.
 - **Brand colors are CSS variables in `:root`** of `css/styles.css`: `--ink #14121C` (background), `--surface #221E2E`, `--cream #F7F3EE` (text), `--rose #FF5C7A` (primary action/danger), `--sun #FFC857` (warning/focus). Fonts are Alexandria (UI) and JetBrains Mono (`.num`), loaded from `fonts/`.
+- **Accessibility baseline** (checked in step 8 with Chrome's accessibility tree):
+  - no unnamed controls, no touch target under 44px, one `h1` per page
+  - color pairs in use are all ≥4.5:1 (lowest: rose on `--surface-2` at 4.8)
+  - field errors are linked with `aria-describedby`
+  - charts have table views, and `forced-colors` keeps bars visible
 - **Layout is mobile-first.** Tap targets are at least 44px, there's no horizontal scroll at 360px, and physical left/right is avoided in favor of logical properties (`inset-inline`, `margin-inline-*`). The RTL layout depends on this.
 
 ## Roadmap (built step by step; stop after each step so the owner can test)
@@ -99,6 +114,5 @@ Otherwise installed users keep the old files, and the `VERSION` test in `tests/p
 5. Search and filters (done)
 6. CSV export and import (done)
 7. PWA (done)
-8. Accessibility pass, privacy page, "delete all my data", deploy README
+8. Accessibility pass, privacy page, wipe, deploy setup (done)
 
-Before publishing, add JetBrains Mono's OFL license to `fonts/`. Only Alexandria's is there now.

@@ -1,13 +1,13 @@
 // VERSION بتاع sw.js = أول 10 حروف من sha256 لمحتوى كل الملفات اللي في ASSETS.
 // لو أي ملف اتغير والـ VERSION متغيرش، المتصفحات هتفضل شايلة النسخة القديمة.
-//   node tests/helpers/sw-version.js          → يطبع الـ VERSION الصح
-//   node tests/helpers/sw-version.js --write  → يكتبه في sw.js
+//   node scripts/sw-version.js          → يطبع الـ VERSION الصح
+//   node scripts/sw-version.js --write  → يكتبه في sw.js
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const vm = require('node:vm');
 
-const ROOT = path.join(__dirname, '..', '..');
+const ROOT = path.join(__dirname, '..');
 const SW = path.join(ROOT, 'sw.js');
 const TEXT = /\.(html|css|js|json|webmanifest|svg|txt)$/;
 

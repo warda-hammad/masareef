@@ -14,6 +14,8 @@ function createApp(initialStorage = {}) {
     getItem: (k) => (Object.prototype.hasOwnProperty.call(mem, k) ? mem[k] : null),
     setItem: (k, v) => { mem[k] = String(v); },
     removeItem: (k) => { delete mem[k]; },
+    key: (i) => Object.keys(mem)[i] ?? null,
+    get length() { return Object.keys(mem).length; },
   };
   const ctx = vm.createContext({ crypto: globalThis.crypto, Intl, console, localStorage, TextDecoder });
   for (const f of LOGIC_FILES) {
@@ -32,6 +34,12 @@ function createApp(initialStorage = {}) {
     blockStorage() {
       localStorage.getItem = () => { throw new Error('SecurityError'); };
       localStorage.setItem = localStorage.getItem;
+      localStorage.removeItem = localStorage.getItem;
+      localStorage.key = localStorage.getItem;
+    },
+    // التخزين بيقرا بس مبيرضاش يمسح
+    failRemoves() {
+      localStorage.removeItem = () => { throw new Error('SecurityError'); };
     },
     saved() {
       return JSON.parse(mem[KEY]);

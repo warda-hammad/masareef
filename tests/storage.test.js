@@ -60,3 +60,43 @@ test('Store.category بيرجع "تانيين" لو الفئة مش موجودة
   const app = createApp();
   assert.equal(app.Store.category('مش موجودة').id, 'other');
 });
+
+test('clearAll: بيمسح بيانات التطبيق ونسخها الاحتياطية بس', () => {
+  const app = createApp({ 'other-app': 'x', [KEY + '.corrupt.1']: '{bad' });
+  app.Expenses.add({ amount: 1000, categoryId: 'food', date: '2026-11-09' });
+  app.Categories.add({ name: 'جيم', color: '#60A5FA' });
+  app.Budget.set(500000);
+  assert.ok(app.Store.clearAll());
+  assert.deepEqual(Object.keys(app.mem), ['other-app']);
+  assert.equal(app.Expenses.all().length, 0);
+  assert.equal(app.Store.categories().length, 7);
+  assert.equal(app.Budget.get(), null);
+  assert.equal(app.Store.error(), null);
+  assert.equal(createApp(app.mem).Expenses.all().length, 0, 'بعد إعادة التحميل');
+});
+
+test('clearAll: بعد مسح داتا بايظة التطبيق بيحفظ عادي تاني', () => {
+  const app = createApp({ [KEY]: '{broken' });
+  assert.equal(app.Store.error(), 'corrupt');
+  assert.ok(app.Store.clearAll());
+  app.Expenses.add({ amount: 100, categoryId: 'food', date: '2026-11-09' });
+  assert.equal(app.saved().expenses.length, 1);
+});
+
+test('clearAll: لو المتصفح رفض المسح بيرجع false ومبيلمسش الداتا', () => {
+  const app = createApp();
+  app.Expenses.add({ amount: 1000, categoryId: 'food', date: '2026-11-09' });
+  app.failRemoves();
+  assert.equal(app.Store.clearAll(), false);
+  assert.equal(app.Expenses.all().length, 1);
+  assert.ok(app.mem[KEY]);
+});
+
+test('clearAll: التخزين مقفول من الأول، فبيصفّر الذاكرة بس', () => {
+  const app = createApp();
+  app.blockStorage();
+  app.Store.load();
+  app.Expenses.add({ amount: 1000, categoryId: 'food', date: '2026-11-09' });
+  assert.ok(app.Store.clearAll());
+  assert.equal(app.Expenses.all().length, 0);
+});

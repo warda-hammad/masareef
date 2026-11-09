@@ -60,6 +60,12 @@ button { cursor: pointer; }
 
 [hidden] { display: none !important; }
 
+/* لون الـ placeholder الافتراضي في المتصفح باهت على الخلفية الغامقة */
+::placeholder { color: var(--muted); opacity: 0.75; }
+
+a { color: var(--sun); text-underline-offset: 3px; }
+a:hover { text-decoration-thickness: 2px; }
+
 .num {
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
@@ -785,6 +791,12 @@ button { cursor: pointer; }
 
 .privacy-note { margin-top: 6px; font-size: 0.8rem; }
 
+.privacy a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
 /* ---------- زرار الإضافة ---------- */
 
 .fab {
@@ -1193,6 +1205,77 @@ button { cursor: pointer; }
     border-bottom: 1px solid var(--line);
     padding-bottom: 20px;
   }
+}
+
+/* ---------- مسح كل البيانات ---------- */
+
+.danger-zone {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.danger-zone .btn { width: 100%; }
+
+#wipe-submit:not(:disabled) {
+  background: var(--rose);
+  color: var(--ink);
+}
+
+/* ---------- صفحة الخصوصية ---------- */
+
+.doc {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 16px 16px 48px;
+}
+
+.doc-back {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-bottom: 8px;
+}
+
+.doc h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.doc h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 28px 0 8px;
+}
+
+.doc p,
+.doc li { color: var(--cream); line-height: 1.8; }
+
+.doc ul { padding-inline-start: 22px; margin: 8px 0; }
+.doc li + li { margin-top: 4px; }
+
+.doc .lead {
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+/* وضع التباين العالي في ويندوز بيشيل الخلفيات، فالعمدان لازم تفضل باينة */
+@media (forced-colors: active) {
+  .bar-fill,
+  .hbar-fill,
+  .day-chart .col,
+  .day-chart .col-today,
+  .swatch-face,
+  .key-today::before {
+    forced-color-adjust: none;
+  }
+  .bar,
+  .hbar-track { border: 1px solid CanvasText; }
 }
 
 @media (prefers-reduced-motion: reduce) {
