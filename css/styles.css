@@ -169,6 +169,67 @@ button { cursor: pointer; }
   color: var(--muted);
 }
 
+/* ---------- الميزانية ---------- */
+
+.budget {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  position: relative;
+  z-index: 1;
+}
+
+.link-btn {
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--sun);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.link-btn:hover { text-decoration: underline; }
+
+.budget-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.budget-used { font-size: 0.9rem; }
+
+.bar {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(247, 243, 238, 0.10);
+  overflow: hidden;
+  margin: 4px 0 10px;
+}
+
+.bar-fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: var(--cream);
+  transition: width 0.3s ease-out;
+}
+
+.budget[data-level="warn"] .bar-fill { background: var(--sun); }
+.budget[data-level="over"] .bar-fill { background: var(--rose); }
+
+.budget-status {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.budget[data-level="warn"] .budget-status { color: var(--sun); }
+.budget[data-level="over"] .budget-status { color: var(--rose); font-weight: 600; }
+.budget[data-level="warn"] .budget-status .cur,
+.budget[data-level="over"] .budget-status .cur { color: inherit; }
+
 /* ---------- اللستة ---------- */
 
 .section-title {
@@ -326,6 +387,9 @@ button { cursor: pointer; }
   visibility: visible;
   transform: none;
 }
+
+.toast[data-tone="warn"] { border-color: var(--sun); color: var(--sun); }
+.toast[data-tone="over"] { border-color: var(--rose); color: var(--rose); font-weight: 600; }
 
 .toast-action {
   min-height: 44px;

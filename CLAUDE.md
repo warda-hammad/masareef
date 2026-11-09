@@ -17,16 +17,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Run all: `node --test` from the repo root (Node's built-in runner; it picks up `tests/*.test.js`).
 - Run one file: `node --test tests/categories.test.js`
 - Run one test by name: `node --test --test-name-pattern="restore"`. Don't pass a bare directory like `tests/`: Node 24 treats it as a file and fails.
-- `tests/helpers/env.js` → `createApp(initialStorage)` loads the DOM-free logic files (`LOGIC_FILES`, in `index.html` order) into a fresh `vm` context with a fake `localStorage`. It returns `{Store, Fmt, Expenses, Categories, mem, saved(), failWrites(), blockStorage()}`. When a new logic file is added, add it to `LOGIC_FILES`.
+- `tests/helpers/env.js` → `createApp(initialStorage)` loads the DOM-free logic files (`LOGIC_FILES`, in `index.html` order) into a fresh `vm` context with a fake `localStorage`. It returns `{Store, Fmt, Expenses, Categories, Budget, mem, saved(), failWrites(), blockStorage()}`. When a new logic file is added, add it to `LOGIC_FILES`.
 - Objects coming out of the vm have foreign prototypes, so wrap them in `plain()` before `deepEqual`.
 - Every roadmap step adds its tests here. `app.js` (the DOM layer) isn't unit-tested; check it in a real browser.
 
 ## Architecture
 
-- **Classic scripts, no ES modules.** Modules break under `file://`. `index.html` loads the scripts in dependency order: `storage.js` → `format.js` → `expenses.js` → `categories.js` → `app.js`. Each of the first four defines one global object (`Store`, `Fmt`, `Expenses`, `Categories`) via an IIFE. `app.js` is the only file that touches the DOM. New modules follow the same pattern and must be added to the script list in order.
+- **Classic scripts, no ES modules.** Modules break under `file://`. `index.html` loads the scripts in dependency order: `storage.js` → `format.js` → `expenses.js` → `categories.js` → `budget.js` → `app.js`. Each of the first five defines one global object (`Store`, `Fmt`, `Expenses`, `Categories`, `Budget`) via an IIFE. `app.js` is the only file that touches the DOM. New modules follow the same pattern and must be added to the script list in order.
 - **Single state object.** `Store` holds `{version, expenses[], categories[], settings{}}` under the key `masareef.v1`. Shape changes go through `migrate()` in `storage.js`, and `VERSION` gets bumped. Corrupt JSON is copied to `masareef.v1.corrupt.<ts>` instead of being overwritten. If that copy fails, or storage is unavailable, `persist` goes false: the app runs memory-only and shows a banner. `Store.error()` drives that banner.
-- **Mutate-then-save with rollback.** Every write goes through `Store.commit(apply, revert)`: it applies the change in memory, saves, and runs `revert` if the save fails (for example on quota errors). Writes return `null`/`false` on failure so the UI can show an error. New data operations (budget, CSV import) should use `Store.commit` too. IDs come from `Store.newId()`.
-- **Undo via snapshots.** `Expenses.remove` returns the removed expense, and `Categories.remove` returns `{category, index, movedIds, movedTo}`. The UI passes that back to `restore()` from the toast's «تراجع» button.
+- **Mutate-then-save with rollback.** Every write goes through `Store.commit(apply, revert)`: it applies the change in memory, saves, and runs `revert` if the save fails (for example on quota errors). Writes return `null`/`false` on failure so the UI can show an error. New data operations (like CSV import) should use `Store.commit` too. IDs come from `Store.newId()`.
+- **Undo via snapshots.** `Expenses.remove` returns the removed expense, `Categories.remove` returns `{category, index, movedIds, movedTo}`, and clearing the budget keeps the old amount for `Budget.set`. The UI passes that back to `restore()` from the toast's «تراجع» button.
 - **Rendering.** `render()` in `app.js` rebuilds the header and the list from state after every change. User-provided text (notes, category names) must only reach the DOM through `textContent`/`createElement`, never `innerHTML`.
 - **Money is integer piasters** (`amount: 15000` = 150 ج.م). Parse with `Fmt.parseAmount` (accepts Arabic-Indic digits, `٫`, thousands separators) and display with `Fmt.moneyNumber`. Wrap displayed amounts in an `dir="ltr"` `.num` span (`moneyEl()` in `app.js`).
 - **Dates are local `YYYY-MM-DD` strings.** Never use `new Date('YYYY-MM-DD')`, because it parses as UTC. Use the `Fmt` helpers.
@@ -37,6 +37,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - Deleting a custom category moves its expenses to a chosen category (default `other`).
   - Expenses reference categories by id. `Store.category()` falls back to `other` for unknown ids, and `migrate()` re-adds any missing built-ins.
   - Name validation (`Categories.validateName`) returns the codes `empty`/`long`/`duplicate`. `app.js` maps them to Arabic messages.
+- **Budget.**
+  - One monthly amount in `settings.budget` (piasters) applies to every month. `Budget.get()` ignores invalid stored values.
+  - `Budget.compute(spent, budget, ym, today)` is pure. It returns `level` (`none` / `ok` / `warn` at ≥80% / `over` at ≥100%), plus `percent`, `remaining`, `over` and `perDay`. `perDay` is rounded down, and today counts as a remaining day.
+  - On expense save, `app.js` takes `Budget.status()` for the expense's month before and after. `Budget.crossed(before, after)` decides whether a warning toast (`tone: 'warn'|'over'`) replaces the normal one.
 
 ## Conventions
 
@@ -49,7 +53,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 1. Page skeleton + add/edit/delete expense (done)
 2. Custom categories (done)
-3. Monthly budget with warnings at 80% (sun) and 100% (rose)
+3. Monthly budget with warnings (done)
 4. Dashboard with hand-drawn SVG charts (by category, by day of month), no chart library
 5. Search + month/category filters, persisted in the URL hash
 6. CSV export (UTF-8 BOM, `date,amount,category,note`) and import with preview and merge/replace

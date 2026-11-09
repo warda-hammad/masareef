@@ -39,6 +39,20 @@
     catMoveTo: $('#c-move-to'),
     catError: $('#c-error'),
     catDel: $('#c-delete'),
+
+    budgetBox: $('#budget-box'),
+    setBudget: $('#set-budget'),
+    budgetActive: $('#budget-active'),
+    budgetUsed: $('#budget-used'),
+    editBudget: $('#edit-budget'),
+    budgetBar: $('#budget-bar'),
+    budgetFill: $('#budget-fill'),
+    budgetStatus: $('#budget-status'),
+    budgetDialog: $('#budget-dialog'),
+    budgetForm: $('#budget-form'),
+    budgetAmount: $('#b-amount'),
+    budgetError: $('#b-error'),
+    budgetClear: $('#b-clear'),
   };
 
   const BANNERS = {
@@ -96,6 +110,7 @@
     els.monthLabel.textContent = 'إجمالي ' + Fmt.monthLabel(ym);
     els.monthTotal.replaceChildren(moneyEl(Expenses.total(monthItems)));
     els.monthCount.textContent = Fmt.countLabel(monthItems.length);
+    renderBudget(Budget.status(ym));
 
     const groups = Expenses.groupByDay(Expenses.all());
     els.empty.hidden = groups.length > 0;
@@ -130,6 +145,42 @@
     btn.append(badgeEl(cat, 'cat-icon'), main, moneyEl(e.amount, 'expense-amount'));
     li.append(btn);
     return li;
+  }
+
+  function renderBudget(s) {
+    const has = s.level !== 'none';
+    els.setBudget.hidden = has;
+    els.budgetActive.hidden = !has;
+    els.budgetBox.dataset.level = s.level;
+    if (!has) return;
+
+    const pct = el('span', 'num', s.percent + '%');
+    pct.dir = 'ltr';
+    els.budgetUsed.replaceChildren('اتصرف ', pct, ' من ', moneyEl(s.budget));
+
+    const shown = Math.min(s.percent, 100);
+    els.budgetFill.style.width = shown + '%';
+    els.budgetBar.setAttribute('aria-valuenow', String(shown));
+    els.budgetBar.setAttribute('aria-valuetext', s.percent + '%');
+
+    if (s.level === 'over') {
+      els.budgetStatus.replaceChildren(...(s.over
+        ? ['⛔ الصرف عدّى الميزانية بـ ', moneyEl(s.over)]
+        : ['⛔ الميزانية خلصت بالظبط.']));
+    } else {
+      els.budgetStatus.replaceChildren(
+        s.level === 'warn' ? '⚠️ الصرف قرّب من الميزانية: فاضل ' : 'فاضل ',
+        moneyEl(s.remaining), '، يعني ', moneyEl(s.perDay), ' في اليوم لحد آخر الشهر.');
+    }
+  }
+
+  // رسالة التوست لما مصروف يطلّع صرف الشهر لمستوى تحذير جديد
+  function budgetWarning(level, s, ym) {
+    const month = ym === Fmt.currentMonth() ? 'الشهر ده' : Fmt.monthLabel(ym);
+    if (level === 'warn') return 'تحذير: صرف ' + month + ' وصل ' + s.percent + '% من الميزانية';
+    return s.over
+      ? 'تحذير: صرف ' + month + ' عدّى الميزانية بـ ' + Fmt.moneyNumber(s.over) + ' ج.م'
+      : 'تحذير: ميزانية ' + month + ' خلصت بالظبط';
   }
 
   function renderBanner() {
@@ -212,12 +263,20 @@
       note: els.note.value.trim().slice(0, 140),
     };
     const wasEdit = editingId !== null;
+    const ym = date.slice(0, 7);
+    const before = Budget.status(ym);
     const saved = wasEdit ? Expenses.update(editingId, input) : Expenses.add(input);
     if (!saved) return setError(els.error, SAVE_FAILED);
 
     els.dialog.close();
     render();
-    toast(wasEdit ? 'اتعدّل المصروف' : 'اتضاف المصروف');
+    const after = Budget.status(ym);
+    const level = Budget.crossed(before, after);
+    if (level) {
+      toast(budgetWarning(level, after, ym), { tone: level, duration: 5000 });
+    } else {
+      toast(wasEdit ? 'اتعدّل المصروف' : 'اتضاف المصروف');
+    }
   }
 
   function onDelete() {
@@ -372,11 +431,55 @@
     });
   }
 
+  /* ---------- الميزانية ---------- */
+
+  function openBudgetForm() {
+    const b = Budget.get();
+    els.budgetAmount.value = b ? Fmt.amountForInput(b) : '';
+    els.budgetClear.hidden = !b;
+    setError(els.budgetError, '');
+    els.budgetDialog.showModal();
+    els.budgetAmount.focus();
+  }
+
+  function onBudgetSubmit(ev) {
+    ev.preventDefault();
+    const amount = Fmt.parseAmount(els.budgetAmount.value);
+    if (amount === null) {
+      return setError(els.budgetError, 'الميزانية لازم تكون رقم أكبر من صفر (مثلاً 5000).', els.budgetAmount);
+    }
+    if (!Budget.set(amount)) return setError(els.budgetError, SAVE_FAILED);
+    els.budgetDialog.close();
+    render();
+    toast('اتحفظت الميزانية');
+  }
+
+  function onBudgetClear() {
+    const previous = Budget.get();
+    if (!Budget.clear()) return setError(els.budgetError, SAVE_FAILED);
+    els.budgetDialog.close();
+    render();
+    toast('اتشالت الميزانية', {
+      action: 'تراجع',
+      duration: 5000,
+      onAction: () => {
+        if (Budget.set(previous)) {
+          render();
+          toast('رجعت الميزانية');
+        } else {
+          toast('مقدرناش نرجّع الميزانية');
+        }
+      },
+    });
+  }
+
   /* ---------- التوست ---------- */
 
+  // tone: 'warn' أو 'over' لتوست التحذير
   function toast(msg, opts) {
     opts = opts || {};
     clearTimeout(toastTimer);
+    els.toast.dataset.tone = opts.tone || '';
     els.toastMsg.textContent = msg;
     els.toastAction.hidden = !opts.action;
     els.toastAction.textContent = opts.action || '';
@@ -415,6 +518,10 @@
   els.del.addEventListener('click', onDelete);
   els.catForm.addEventListener('submit', onCategorySubmit);
   els.catDel.addEventListener('click', onCategoryDelete);
+  els.setBudget.addEventListener('click', openBudgetForm);
+  els.editBudget.addEventListener('click', openBudgetForm);
+  els.budgetForm.addEventListener('submit', onBudgetSubmit);
+  els.budgetClear.addEventListener('click', onBudgetClear);
 
   // زرار ✕ والضغط على الخلفية بيقفلوا أي dialog
   document.querySelectorAll('.sheet-dialog').forEach((d) => {
