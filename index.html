@@ -42,7 +42,70 @@
       </section>
     </header>
 
-    <section class="expenses" aria-labelledby="list-title">
+    <div class="tabs" role="tablist" aria-label="طريقة العرض">
+      <button id="tab-list" class="tab" role="tab" type="button" aria-selected="true" aria-controls="view-list">المصاريف</button>
+      <button id="tab-dash" class="tab" role="tab" type="button" aria-selected="false" aria-controls="view-dash" tabindex="-1">الداشبورد</button>
+    </div>
+
+    <section id="view-dash" class="dashboard" role="tabpanel" aria-labelledby="tab-dash" hidden>
+      <div class="month-nav">
+        <button id="dash-prev" class="icon-btn" type="button" aria-label="الشهر اللي فات">→</button>
+        <h2 id="dash-month" class="month-nav-title" aria-live="polite"></h2>
+        <button id="dash-next" class="icon-btn" type="button" aria-label="الشهر الجاي">←</button>
+      </div>
+
+      <div class="tiles">
+        <div class="tile tile-hero">
+          <p class="tile-label">إجمالي الشهر</p>
+          <p id="dash-total" class="tile-value"></p>
+          <p id="dash-delta" class="tile-sub"></p>
+        </div>
+        <div class="tile">
+          <p class="tile-label">أكبر فئة</p>
+          <p id="dash-top" class="tile-value-sm"></p>
+          <p id="dash-top-sub" class="tile-sub"></p>
+        </div>
+        <div class="tile">
+          <p class="tile-label">المتوسط اليومي</p>
+          <p id="dash-avg" class="tile-value-sm"></p>
+          <p id="dash-avg-sub" class="tile-sub"></p>
+        </div>
+      </div>
+
+      <div id="dash-empty" class="empty" hidden>
+        <p class="empty-icon" aria-hidden="true">📊</p>
+        <p>مفيش مصاريف متسجلة في الشهر ده.</p>
+      </div>
+
+      <div id="dash-charts">
+        <section class="chart-card" aria-labelledby="cat-chart-title">
+          <h3 id="cat-chart-title" class="chart-title">الصرف حسب الفئة</h3>
+          <ul id="cat-chart" class="hbars"></ul>
+          <details class="chart-table">
+            <summary>عرض كجدول</summary>
+            <table>
+              <thead><tr><th scope="col">الفئة</th><th scope="col">المبلغ</th><th scope="col">النسبة</th><th scope="col">العدد</th></tr></thead>
+              <tbody id="cat-table"></tbody>
+            </table>
+          </details>
+        </section>
+
+        <section class="chart-card" aria-labelledby="day-chart-title">
+          <h3 id="day-chart-title" class="chart-title">الصرف على أيام الشهر</h3>
+          <div id="day-chart" class="day-chart"></div>
+          <p id="day-key" class="chart-key"></p>
+          <details class="chart-table">
+            <summary>عرض كجدول</summary>
+            <table>
+              <thead><tr><th scope="col">اليوم</th><th scope="col">المبلغ</th><th scope="col">العدد</th></tr></thead>
+              <tbody id="day-table"></tbody>
+            </table>
+          </details>
+        </section>
+      </div>
+    </section>
+
+    <section id="view-list" class="expenses" role="tabpanel" aria-labelledby="tab-list">
       <h2 id="list-title" class="section-title">المصاريف</h2>
       <div id="empty-state" class="empty" hidden>
         <p class="empty-icon" aria-hidden="true">🧾</p>
@@ -59,6 +122,8 @@
   </main>
 
   <button id="add-btn" class="fab" type="button"><span aria-hidden="true">+</span> مصروف</button>
+
+  <div id="chart-tip" class="chart-tip" role="tooltip" hidden></div>
 
   <div id="toast" class="toast" role="status" aria-live="polite">
     <span id="toast-msg"></span>
@@ -185,6 +250,9 @@
   <script src="js/expenses.js"></script>
   <script src="js/categories.js"></script>
   <script src="js/budget.js"></script>
+  <script src="js/stats.js"></script>
+  <script src="js/dom.js"></script>
+  <script src="js/charts.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

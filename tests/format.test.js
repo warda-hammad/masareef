@@ -33,6 +33,23 @@ test('moneyNumber و amountForInput', () => {
   assert.equal(Fmt.amountForInput(15000), '150');
 });
 
+test('compact للمحاور', () => {
+  assert.equal(Fmt.compact(0), '0');
+  assert.equal(Fmt.compact(950), '950');
+  assert.equal(Fmt.compact(0.25), '0.25');
+  assert.equal(Fmt.compact(1000), '1K');
+  assert.equal(Fmt.compact(1500), '1.5K');
+  assert.equal(Fmt.compact(12345), '12.3K');
+  assert.equal(Fmt.compact(2000000), '2M');
+});
+
+test('daysLabel بصيغ الجمع الصح', () => {
+  assert.equal(Fmt.daysLabel(1), 'يوم واحد');
+  assert.equal(Fmt.daysLabel(2), 'يومين');
+  assert.equal(Fmt.daysLabel(9), '9 أيام');
+  assert.equal(Fmt.daysLabel(31), '31 يوم');
+});
+
 test('isISODate بيرفض التواريخ اللي مش موجودة', () => {
   assert.equal(Fmt.isISODate('2026-11-09'), true);
   assert.equal(Fmt.isISODate('2026-02-30'), false);

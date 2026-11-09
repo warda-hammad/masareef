@@ -35,6 +35,14 @@ const Fmt = (function () {
     return piasters % 100 === 0 ? nf0.format(piasters / 100) : nf2.format(piasters / 100);
   }
 
+  // للمحاور: 950 و 1.5K و 2M (القيمة بالجنيه)
+  function compact(pounds) {
+    const trim = (n) => String(Number(n.toFixed(1)));
+    if (pounds >= 1e6) return trim(pounds / 1e6) + 'M';
+    if (pounds >= 1e3) return trim(pounds / 1e3) + 'K';
+    return String(Number(pounds.toFixed(2)));
+  }
+
   function amountForInput(piasters) {
     return piasters % 100 === 0 ? String(piasters / 100) : (piasters / 100).toFixed(2);
   }
@@ -85,10 +93,18 @@ const Fmt = (function () {
     return n + ' مصروف';
   }
 
+  function daysLabel(n) {
+    if (n === 1) return 'يوم واحد';
+    if (n === 2) return 'يومين';
+    if (n <= 10) return n + ' أيام';
+    return n + ' يوم';
+  }
+
   return {
     normalizeDigits,
     parseAmount,
     moneyNumber,
+    compact,
     amountForInput,
     isISODate,
     todayISO,
@@ -96,5 +112,6 @@ const Fmt = (function () {
     dayLabel,
     monthLabel,
     countLabel,
+    daysLabel,
   };
 })();

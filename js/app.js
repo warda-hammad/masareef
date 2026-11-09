@@ -53,6 +53,27 @@
     budgetAmount: $('#b-amount'),
     budgetError: $('#b-error'),
     budgetClear: $('#b-clear'),
+
+    tabList: $('#tab-list'),
+    tabDash: $('#tab-dash'),
+    viewList: $('#view-list'),
+    viewDash: $('#view-dash'),
+    dashPrev: $('#dash-prev'),
+    dashNext: $('#dash-next'),
+    dashMonth: $('#dash-month'),
+    dashTotal: $('#dash-total'),
+    dashDelta: $('#dash-delta'),
+    dashTop: $('#dash-top'),
+    dashTopSub: $('#dash-top-sub'),
+    dashAvg: $('#dash-avg'),
+    dashAvgSub: $('#dash-avg-sub'),
+    dashEmpty: $('#dash-empty'),
+    dashCharts: $('#dash-charts'),
+    catChart: $('#cat-chart'),
+    catTable: $('#cat-table'),
+    dayChart: $('#day-chart'),
+    dayKey: $('#day-key'),
+    dayTable: $('#day-table'),
   };
 
   const BANNERS = {
@@ -75,28 +96,11 @@
   let catDeleteArmed = false;
   let catFromExpenseForm = false; // الفئة اتفتحت من زرار "+ فئة" جوه فورم المصروف
   let toastTimer = null;
+  let view = location.hash === '#dashboard' ? 'dash' : 'list';
+  let dashMonth = Fmt.currentMonth();
+  let dayChartWidth = 0;
 
-  function el(tag, className, text) {
-    const node = document.createElement(tag);
-    if (className) node.className = className;
-    if (text !== undefined) node.textContent = text;
-    return node;
-  }
-
-  function moneyEl(piasters, className) {
-    const wrap = el('span', 'money' + (className ? ' ' + className : ''));
-    const num = el('span', 'num', Fmt.moneyNumber(piasters));
-    num.dir = 'ltr';
-    wrap.append(num, ' ', el('span', 'cur', 'ج.م'));
-    return wrap;
-  }
-
-  function badgeEl(cat, className) {
-    const b = el('span', className, Categories.badge(cat));
-    b.style.setProperty('--cat', cat.color);
-    b.setAttribute('aria-hidden', 'true');
-    return b;
-  }
+  const { el, moneyEl, badgeEl } = Dom;
 
   function usageLabel(n) {
     return n ? Fmt.countLabel(n) : 'مفيش مصاريف';
@@ -117,6 +121,99 @@
     els.list.replaceChildren(...groups.map(dayEl));
 
     if (els.catsDialog.open) renderCategoryList();
+    if (view === 'dash') renderDashboard();
+  }
+
+  /* ---------- الداشبورد ---------- */
+
+  function setView(next, focus) {
+    view = next;
+    const dash = view === 'dash';
+    els.viewDash.hidden = !dash;
+    els.viewList.hidden = dash;
+    [[els.tabList, !dash], [els.tabDash, dash]].forEach(([tab, on]) => {
+      tab.setAttribute('aria-selected', String(on));
+      tab.tabIndex = on ? 0 : -1;
+    });
+    if (focus) (dash ? els.tabDash : els.tabList).focus();
+    history.replaceState(null, '', dash ? '#dashboard' : location.pathname + location.search);
+    Charts.hideTip();
+    if (dash) renderDashboard();
+  }
+
+  function renderDelta(s) {
+    const prev = Fmt.monthLabel(s.prevYm);
+    let text = '';
+    let trend = '';
+    if (s.deltaPct === null) {
+      text = s.total ? 'مفيش مصاريف في ' + prev + ' للمقارنة' : '';
+    } else if (s.total === s.prevTotal) {
+      text = 'زي ' + prev + ' بالظبط';
+    } else if (s.deltaPct === 0) {
+      text = 'تقريباً زي ' + prev;
+    } else {
+      trend = s.deltaPct > 0 ? 'up' : 'down';
+      text = (s.deltaPct > 0 ? '↑ ' : '↓ ') + '‎' + Math.abs(s.deltaPct) + '% عن ' + prev;
+    }
+    els.dashDelta.textContent = text;
+    els.dashDelta.dataset.trend = trend;
+  }
+
+  function renderDashboard() {
+    const today = Fmt.todayISO();
+    const range = Stats.monthRange(today);
+    if (dashMonth < range.min) dashMonth = range.min;
+    if (dashMonth > range.max) dashMonth = range.max;
+    els.dashPrev.disabled = dashMonth <= range.min;
+    els.dashNext.disabled = dashMonth >= range.max;
+
+    const s = Stats.summary(dashMonth, today);
+    const isCurrent = dashMonth === today.slice(0, 7);
+    els.dashMonth.textContent = Fmt.monthLabel(dashMonth);
+    els.dashTotal.replaceChildren(moneyEl(s.total));
+    renderDelta(s);
+
+    if (s.top) {
+      const cat = Store.category(s.top.categoryId);
+      els.dashTop.replaceChildren(badgeEl(cat, 'tile-badge'), document.createTextNode(cat.name));
+      els.dashTopSub.replaceChildren(moneyEl(s.top.total), ' · ' + Charts.percent(s.top.share));
+    } else {
+      els.dashTop.textContent = '—';
+      els.dashTopSub.textContent = '';
+    }
+
+    if (s.elapsedDays) {
+      els.dashAvg.replaceChildren(moneyEl(s.dailyAvg));
+      els.dashAvgSub.textContent = 'على ' + Fmt.daysLabel(s.elapsedDays) + (isCurrent ? ' لحد النهارده' : '');
+    } else {
+      els.dashAvg.textContent = '—';
+      els.dashAvgSub.textContent = 'الشهر لسه مبدأش';
+    }
+
+    els.dashEmpty.hidden = s.count > 0;
+    els.dashCharts.hidden = s.count === 0;
+    if (!s.count) return;
+
+    Charts.categoryBars(els.catChart, s.byCategory);
+    Charts.categoryTable(els.catTable, s.byCategory);
+    Charts.dayColumns(els.dayChart, s.byDay, {
+      today: isCurrent ? Number(today.slice(8, 10)) : null,
+      avg: s.dailyAvg,
+    });
+    dayChartWidth = els.dayChart.clientWidth;
+    Charts.dayTable(els.dayTable, s.byDay);
+
+    const avgKey = el('span', 'key key-avg');
+    avgKey.append('المتوسط اليومي ', moneyEl(s.dailyAvg));
+    const keys = [avgKey];
+    if (isCurrent) keys.push(el('span', 'key key-today', 'النهارده'));
+    els.dayKey.replaceChildren(...keys);
+  }
+
+  function moveMonth(n) {
+    dashMonth = Stats.shiftMonth(dashMonth, n);
+    Charts.hideTip();
+    renderDashboard();
   }
 
   function dayEl(group) {
@@ -523,6 +620,26 @@
   els.budgetForm.addEventListener('submit', onBudgetSubmit);
   els.budgetClear.addEventListener('click', onBudgetClear);
 
+  els.tabList.addEventListener('click', () => setView('list'));
+  els.tabDash.addEventListener('click', () => setView('dash'));
+  // نمط الـ tabs: الأسهم بتنقل بين التابين
+  [els.tabList, els.tabDash].forEach((tab) => tab.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
+    ev.preventDefault();
+    setView(view === 'dash' ? 'list' : 'dash', true);
+  }));
+  els.dashPrev.addEventListener('click', () => moveMonth(-1));
+  els.dashNext.addEventListener('click', () => moveMonth(1));
+
+  // عرض chart الأيام بيتحسب بالبكسل، فنعيد رسمه لو العرض اتغير
+  if (window.ResizeObserver) {
+    new ResizeObserver(() => {
+      if (view === 'dash' && !els.dashCharts.hidden && els.dayChart.clientWidth !== dayChartWidth) {
+        renderDashboard();
+      }
+    }).observe(els.dayChart);
+  }
+
   // زرار ✕ والضغط على الخلفية بيقفلوا أي dialog
   document.querySelectorAll('.sheet-dialog').forEach((d) => {
     d.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', () => d.close()));
@@ -551,5 +668,6 @@
 
   Store.load();
   renderBanner();
+  setView(view);
   render();
 })();

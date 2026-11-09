@@ -5,7 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const JS_DIR = path.join(__dirname, '..', '..', 'js');
-const LOGIC_FILES = ['storage.js', 'format.js', 'expenses.js', 'categories.js', 'budget.js'];
+const LOGIC_FILES = ['storage.js', 'format.js', 'expenses.js', 'categories.js', 'budget.js', 'stats.js'];
 const KEY = 'masareef.v1';
 
 function createApp(initialStorage = {}) {
@@ -19,7 +19,7 @@ function createApp(initialStorage = {}) {
   for (const f of LOGIC_FILES) {
     vm.runInContext(fs.readFileSync(path.join(JS_DIR, f), 'utf8'), ctx, { filename: f });
   }
-  const api = vm.runInContext('({ Store, Fmt, Expenses, Categories, Budget })', ctx);
+  const api = vm.runInContext('({ Store, Fmt, Expenses, Categories, Budget, Stats })', ctx);
   api.Store.load();
 
   return Object.assign(api, {
