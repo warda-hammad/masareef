@@ -1,7 +1,7 @@
 /* Service worker: بيخزّن كل ملفات التطبيق عشان يشتغل من غير نت (cache-first).
    VERSION = hash لمحتوى الملفات. بعد أي تعديل في ملف من ASSETS:
    node scripts/sw-version.js --write */
-const VERSION = 'v-b0620954cf';
+const VERSION = 'v-c512759e18';
 const CACHE = 'masareef-' + VERSION;
 
 const ASSETS = [

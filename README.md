@@ -59,10 +59,10 @@ node scripts/build-site.js _site
 
 ### GitHub Pages
 
-الـ workflow موجود في `.github/workflows/pages.yml`: بيشغّل الاختبارات، ويجهز `_site`، وينشره مع كل push على `main`.
+الـ workflow موجود في `.github/workflows/pages.yml`: بيشغّل الاختبارات، ويجهز `_site`، وينشره مع كل push على `main` أو `master`.
 
 1. عمل repo على GitHub ورفع المشروع عليه.
-2. البرانش الحالي هنا اسمه `master`، والـ workflow شغال على `main`. يا إما البرانش يتغير اسمه (`git branch -m master main`) قبل الرفع، يا إما `main` يتغير في الـ workflow.
+2. الـ workflow بيشتغل مع أي push على `main` أو `master`. GitHub بيسمح افتراضياً بالنشر من البرانش الأساسي للـ repo بس، فلو الاتنين موجودين، التاني محتاج يتضاف في Settings ← Environments ← github-pages.
 3. في الـ repo: Settings ← Pages ← Source = **GitHub Actions**.
 4. بعد أول push، الرابط بيبقى `https://<username>.github.io/<repo>/`. التطبيق شغال من فولدر فرعي عادي، لأن كل المسارات نسبية.
 

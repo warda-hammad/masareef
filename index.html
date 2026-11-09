@@ -200,8 +200,9 @@
 
       <label class="field" for="f-date">
         <span class="field-label">التاريخ</span>
-        <input id="f-date" name="date" type="date" class="input" required>
+        <input id="f-date" name="date" type="date" class="input" required aria-describedby="f-date-hint">
       </label>
+      <p id="f-date-hint" class="field-warn" aria-live="polite" hidden></p>
 
       <label class="field" for="f-note">
         <span class="field-label">ملاحظة <span class="optional">(اختياري)</span></span>

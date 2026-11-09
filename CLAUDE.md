@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Deploy (prepared, never run from here)
 
-- `.github/workflows/pages.yml` runs `node --test`, builds `_site`, and publishes to GitHub Pages on push to `main`. The local branch is `master`.
+- `.github/workflows/pages.yml` runs `node --test`, builds `_site`, and publishes to GitHub Pages on push to `main` or `master`. The local branch is `master`.
 - `netlify.toml` does the same build, plus headers: full CSP with `frame-ancestors`, `nosniff`, `no-referrer`, and `no-cache` for `sw.js`.
 - Pushing, publishing and creating accounts are the owner's decision. Never do them unasked.
 

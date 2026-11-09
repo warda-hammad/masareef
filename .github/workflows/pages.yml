@@ -1,11 +1,13 @@
 # بيشغّل الاختبارات، ويجهز فولدر _site، وينشره على GitHub Pages.
-# بيشتغل مع أي push على main، أو بإيدك من تاب Actions (workflow_dispatch).
+# بيشتغل مع أي push على main أو master، أو بإيدك من تاب Actions (workflow_dispatch).
 # قبل أول نشر: Settings → Pages → Source = "GitHub Actions".
+# ملحوظة: GitHub بيسمح افتراضياً بالنشر من البرانش الأساسي للـ repo بس (environment: github-pages).
+# لو الاتنين موجودين، التاني محتاج يتضاف في Settings → Environments → github-pages.
 name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   workflow_dispatch:
 
 permissions:

@@ -1143,6 +1143,12 @@ a:hover { text-decoration-thickness: 2px; }
 
 .move-box .field-label { color: var(--cream); }
 
+.field-warn {
+  margin-top: -8px;
+  color: var(--sun);
+  font-size: 0.85rem;
+}
+
 .form-error {
   color: var(--rose);
   font-size: 0.9rem;

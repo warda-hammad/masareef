@@ -125,10 +125,17 @@ const Csv = (function () {
     return Fmt.isISODate(iso) ? iso : null;
   }
 
-  // بيقبل "150"، "1,250.50"، "١٥٠"، "150 ج.م"
+  // بيقبل "150"، "1,250.50"، "١٥٠"، "150 ج.م". بيرجع { piasters } أو { error } بأكواد Fmt.checkAmount
+  function checkAmount(raw) {
+    const text = String(raw == null ? '' : raw).trim();
+    if (!text) return { error: 'empty' };
+    const s = text.replace(/[^\d٠-٩۰-۹.,٫٬-]/g, '');
+    return s ? Fmt.checkAmount(s) : { error: 'invalid' };
+  }
+
   function parseAmount(raw) {
-    const s = String(raw).replace(/[^\d٠-٩۰-۹.,٫٬-]/g, '');
-    return s ? Fmt.parseAmount(s) : null;
+    const r = checkAmount(raw);
+    return r.error ? null : r.piasters;
   }
 
   function findCategoryId(name) {
@@ -140,7 +147,7 @@ const Csv = (function () {
 
   // بيقرا النص ويرجع الصفوف السليمة والأخطاء (برقم السطر) والفئات الجديدة.
   // مبيغيرش أي حاجة في الداتا؛ التطبيق بيحصل في apply()
-  function analyze(text) {
+  function analyze(text, today) {
     const parsed = parse(text);
     if (!parsed.length) return { error: 'empty' };
 
@@ -159,8 +166,11 @@ const Csv = (function () {
       const get = (k) => (idx[k] >= 0 && r.cells[idx[k]] != null ? r.cells[idx[k]] : '');
       const date = parseDate(get('date'));
       if (!date) return errors.push({ line: r.line, code: 'date', value: get('date').trim() });
-      const amount = parseAmount(get('amount'));
-      if (amount === null) return errors.push({ line: r.line, code: 'amount', value: get('amount').trim() });
+      const checked = checkAmount(get('amount'));
+      if (checked.error) {
+        return errors.push({ line: r.line, code: 'amount', reason: checked.error, value: get('amount').trim() });
+      }
+      const amount = checked.piasters;
 
       const categoryName = unescapeText(get('category').trim()).replace(/\s+/g, ' ')
         .slice(0, Categories.MAX_NAME).trim();
@@ -179,7 +189,9 @@ const Csv = (function () {
       });
     });
 
-    return { rows, errors, newCategories: Array.from(newCategories.values()), total: body.length };
+    // future = عدد الصفوف اللي تاريخها لسه مجاش (تنبيه بس في شاشة المراجعة)
+    const future = rows.filter((r) => Fmt.isFutureDate(r.date, today)).length;
+    return { rows, errors, newCategories: Array.from(newCategories.values()), total: body.length, future };
   }
 
   /* ---------- تطبيق الاستيراد ---------- */
@@ -279,6 +291,7 @@ const Csv = (function () {
     detectDelimiter,
     parse,
     parseDate,
+    checkAmount,
     parseAmount,
     analyze,
     countDuplicates,

@@ -17,6 +17,7 @@
     amount: $('#f-amount'),
     cats: $('#f-categories'),
     date: $('#f-date'),
+    dateHint: $('#f-date-hint'),
     note: $('#f-note'),
     error: $('#form-error'),
     del: $('#delete-btn'),
@@ -125,6 +126,25 @@
   };
 
   const SAVE_FAILED = 'مقدرناش نحفظ. ممكن تكون مساحة التخزين في المتصفح مليانة.';
+
+  const MAX_AMOUNT_TEXT = Fmt.moneyNumber(Fmt.MAX_PIASTERS) + ' ج.م';
+
+  // مفاتيحها هي أكواد Fmt.checkAmount
+  const AMOUNT_ERRORS = {
+    empty: 'المبلغ مطلوب.',
+    invalid: 'المبلغ لازم يكون رقم، مثلاً 150 أو 75.50.',
+    decimals: 'المبلغ ممكن يكون فيه رقمين بس بعد العلامة (القروش)، مثلاً 75.50.',
+    zero: 'المبلغ لازم يكون أكبر من صفر.',
+    'too-big': 'المبلغ كبير قوي. الحد الأقصى ' + MAX_AMOUNT_TEXT + '.',
+  };
+
+  const BUDGET_ERRORS = {
+    empty: 'الميزانية مطلوبة.',
+    invalid: 'الميزانية لازم تكون رقم، مثلاً 5000.',
+    decimals: 'الميزانية ممكن يكون فيها رقمين بس بعد العلامة (القروش).',
+    zero: 'الميزانية لازم تكون أكبر من صفر.',
+    'too-big': 'الميزانية كبيرة قوي. الحد الأقصى ' + MAX_AMOUNT_TEXT + '.',
+  };
 
   const NAME_ERRORS = {
     empty: 'الاسم مطلوب.',
@@ -419,6 +439,7 @@
     els.amount.value = expense ? Fmt.amountForInput(expense.amount) : '';
     renderCategoryChips(expense ? expense.categoryId : Expenses.lastUsedCategory());
     els.date.value = expense ? expense.date : Fmt.todayISO();
+    updateDateHint();
     els.note.value = expense ? expense.note : '';
     els.del.hidden = !expense;
     disarmDelete();
@@ -444,12 +465,18 @@
     els.del.classList.remove('armed');
   }
 
+  // تنبيه تحت خانة التاريخ لو التاريخ في المستقبل (مبيمنعش الحفظ)
+  function updateDateHint() {
+    const note = Fmt.futureNote(els.date.value);
+    els.dateHint.textContent = note;
+    els.dateHint.hidden = !note;
+  }
+
   function onSubmit(ev) {
     ev.preventDefault();
-    const amount = Fmt.parseAmount(els.amount.value);
-    if (amount === null) {
-      return setError(els.error, 'المبلغ لازم يكون رقم أكبر من صفر (مثلاً 150 أو 75.50).', els.amount);
-    }
+    const checked = Fmt.checkAmount(els.amount.value);
+    if (checked.error) return setError(els.error, AMOUNT_ERRORS[checked.error], els.amount);
+    const amount = checked.piasters;
     const date = els.date.value;
     if (!Fmt.isISODate(date)) return setError(els.error, 'التاريخ مطلوب.', els.date);
 
@@ -469,7 +496,11 @@
     render();
     const after = Budget.status(ym);
     const level = Budget.crossed(before, after);
-    if (level) {
+    if (Fmt.isFutureDate(date)) {
+      // تنبيه بس، مش منع: ممكن يكون مصروف متخطط له
+      toast((wasEdit ? 'اتعدّل المصروف' : 'اتضاف المصروف') + ' بتاريخ لسه مجاش: ' + Fmt.dayLabel(date),
+        { tone: 'warn', duration: 5000 });
+    } else if (level) {
       toast(budgetWarning(level, after, ym), { tone: level, duration: 5000 });
     } else if (Filters.isActive(filter) && !Filters.matches(saved, filter)) {
       toast((wasEdit ? 'اتعدّل المصروف' : 'اتضاف المصروف') + '، بس مش باين بسبب الفلتر', {
@@ -647,10 +678,9 @@
 
   function onBudgetSubmit(ev) {
     ev.preventDefault();
-    const amount = Fmt.parseAmount(els.budgetAmount.value);
-    if (amount === null) {
-      return setError(els.budgetError, 'الميزانية لازم تكون رقم أكبر من صفر (مثلاً 5000).', els.budgetAmount);
-    }
+    const checked = Fmt.checkAmount(els.budgetAmount.value);
+    if (checked.error) return setError(els.budgetError, BUDGET_ERRORS[checked.error], els.budgetAmount);
+    const amount = checked.piasters;
     if (!Budget.set(amount)) return setError(els.budgetError, SAVE_FAILED);
     els.budgetDialog.close();
     render();
@@ -690,10 +720,16 @@
     read: 'مقدرناش نقرا الملف.',
   };
 
+  // أخطاء صفوف الـ CSV: التاريخ، أو المبلغ بنفس أكواد Fmt.checkAmount
   const ROW_ERRORS = {
     date: 'التاريخ مش مفهوم',
-    amount: 'المبلغ مش رقم صحيح أكبر من صفر',
+    'amount:empty': 'المبلغ فاضي',
+    'amount:invalid': 'المبلغ مش رقم',
+    'amount:decimals': 'المبلغ فيه أكتر من رقمين بعد العلامة',
+    'amount:zero': 'المبلغ لازم يكون أكبر من صفر',
+    'amount:too-big': 'المبلغ كبير قوي (الحد الأقصى ' + MAX_AMOUNT_TEXT + ')',
   };
+  const rowError = (e) => ROW_ERRORS[e.reason ? e.code + ':' + e.reason : e.code] || ROW_ERRORS.date;
 
   let pendingImport = null;
 
@@ -753,7 +789,7 @@
     els.impErrorsBox.open = a.rows.length === 0;
     els.impErrorsTitle.textContent = 'الصفوف اللي فيها مشاكل وهتتساب (' + a.errors.length + ')';
     const listed = a.errors.slice(0, MAX_LISTED_ERRORS).map((e) =>
-      el('li', '', 'سطر ' + e.line + ': ' + ROW_ERRORS[e.code] + (e.value ? ' («' + e.value + '»)' : '')));
+      el('li', '', 'سطر ' + e.line + ': ' + rowError(e) + (e.value ? ' («' + e.value + '»)' : '')));
     if (a.errors.length > MAX_LISTED_ERRORS) {
       listed.push(el('li', 'hint', 'و' + (a.errors.length - MAX_LISTED_ERRORS) + ' غيرهم.'));
     }
@@ -792,6 +828,12 @@
 
     const notes = [];
     if (a.newCategories.length) notes.push('هيتعمل فئات جديدة: ' + a.newCategories.join('، '));
+    if (a.future === 1) {
+      notes.push('⚠️ فيه صف واحد تاريخه لسه مجاش، وهيتسجل عادي.');
+    } else if (a.future) {
+      const rows = a.future === 2 ? 'صفين' : a.future + (a.future <= 10 ? ' صفوف' : ' صف');
+      notes.push('⚠️ فيه ' + rows + ' تاريخهم لسه مجاش، وهيتسجلوا عادي.');
+    }
     if (dups === 1) notes.push('فيه مصروف واحد في الملف موجود قبل كده، فهيتساب.');
     else if (dups) notes.push(Fmt.countLabel(dups) + ' في الملف موجودين قبل كده، فهيتسابوا.');
     els.impNotes.replaceChildren(...notes.map((t) => el('li', '', t)));
@@ -985,6 +1027,8 @@
   });
 
   els.form.addEventListener('submit', onSubmit);
+  els.date.addEventListener('input', updateDateHint);
+  els.date.addEventListener('change', updateDateHint);
   els.del.addEventListener('click', onDelete);
   els.catForm.addEventListener('submit', onCategorySubmit);
   els.catDel.addEventListener('click', onCategoryDelete);

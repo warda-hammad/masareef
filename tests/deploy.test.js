@@ -77,6 +77,8 @@ test('GitHub Pages workflow: اختبارات ثم build ثم نشر الـ arti
     assert.ok(i > at, s + ' مش موجودة أو مش بالترتيب');
     at = i;
   }
+  assert.match(yml, /branches: \[main, master\]/, 'بيشتغل على main و master الاتنين');
+  assert.match(yml, /workflow_dispatch/);
   assert.match(yml, /pages: write/);
   assert.match(yml, /id-token: write/);
   assert.match(yml, /path: _site/);

@@ -119,8 +119,31 @@ test('analyze: الصفوف الغلط بتتعد برقم السطر والبا
   assert.equal(a.rows.length, 2);
   assert.deepEqual(plain(a.errors), [
     { line: 4, code: 'date', value: 'امبارح' },
-    { line: 5, code: 'amount', value: 'ببلاش' },
+    { line: 5, code: 'amount', reason: 'invalid', value: 'ببلاش' },
   ]);
+});
+
+test('analyze: سبب غلط المبلغ بيتحدد (فاضي، صفر، كبير قوي، قروش كتير)', () => {
+  const a = createApp().Csv.analyze([
+    'date,amount',
+    '2026-11-01,',
+    '2026-11-02,0',
+    '2026-11-03,99999999999',
+    '2026-11-04,1.555',
+    '2026-11-05,-50',
+    '2026-11-06,100000000 ج.م',
+  ].join('\n'));
+  assert.deepEqual(plain(a.errors.map((e) => [e.line, e.reason])), [
+    [2, 'empty'], [3, 'zero'], [4, 'too-big'], [5, 'decimals'], [6, 'invalid'],
+  ]);
+  assert.equal(a.rows.length, 1, 'الحد الأقصى نفسه مقبول');
+});
+
+test('analyze: بيعد الصفوف اللي تاريخها في المستقبل من غير ما يرفضها', () => {
+  const a = createApp().Csv.analyze('date,amount\n2026-11-09,1\n2026-11-10,1\n2027-01-15,1', '2026-11-09');
+  assert.equal(a.rows.length, 3);
+  assert.equal(a.errors.length, 0);
+  assert.equal(a.future, 2);
 });
 
 test('analyze: الفئات بتتطابق من غير ما تفرق في الهمزة، والجديدة بتتعد مرة واحدة', () => {

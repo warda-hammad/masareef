@@ -26,6 +26,57 @@ test('parseAmount: بيرفض أي حاجة مش مبلغ صحيح أكبر من
   assert.equal(Fmt.parseAmount('100000001'), null, 'أكبر من الحد الأقصى');
 });
 
+test('checkAmount: كل غلط ليه كود مختلف', () => {
+  const err = (s) => Fmt.checkAmount(s).error;
+  assert.equal(err(''), 'empty');
+  assert.equal(err('   '), 'empty');
+  assert.equal(err(null), 'empty');
+  assert.equal(err('abc'), 'invalid');
+  assert.equal(err('-5'), 'invalid');
+  assert.equal(err('1e3'), 'invalid');
+  assert.equal(err('1.234'), 'decimals');
+  assert.equal(err('١٫٥٥٥'), 'decimals');
+  assert.equal(err('0'), 'zero');
+  assert.equal(err('0.00'), 'zero');
+  assert.equal(err('.0'), 'zero');
+});
+
+test('checkAmount: المبلغ الكبير قوي بيقول too-big مش "لازم يكون أكبر من صفر"', () => {
+  assert.equal(Fmt.checkAmount('99999999999').error, 'too-big');
+  assert.equal(Fmt.checkAmount('١٠٠٠٠٠٠٠٠٠٠').error, 'too-big');
+  assert.equal(Fmt.checkAmount('9'.repeat(40)).error, 'too-big', 'أكبر من أي رقم آمن في JS');
+  assert.equal(Fmt.checkAmount('100000000.01').error, 'too-big');
+  assert.deepEqual({ ...Fmt.checkAmount('100,000,000') }, { piasters: Fmt.MAX_PIASTERS }, 'الحد الأقصى نفسه مقبول');
+  assert.deepEqual({ ...Fmt.checkAmount('75.5') }, { piasters: 7550 });
+});
+
+test('isFutureDate', () => {
+  assert.equal(Fmt.isFutureDate('2026-11-10', '2026-11-09'), true);
+  assert.equal(Fmt.isFutureDate('2027-01-15', '2026-11-09'), true);
+  assert.equal(Fmt.isFutureDate('2026-11-09', '2026-11-09'), false, 'النهارده مش مستقبل');
+  assert.equal(Fmt.isFutureDate('2026-10-31', '2026-11-09'), false);
+});
+
+test('futureNote: تنبيه بس للتاريخ اللي لسه مجاش، وبيقول هيظهر في أنهي شهر', () => {
+  assert.equal(Fmt.futureNote('2026-11-09', '2026-11-09'), '');
+  assert.equal(Fmt.futureNote('2026-11-01', '2026-11-09'), '');
+  assert.equal(Fmt.futureNote('', '2026-11-09'), '');
+  assert.equal(Fmt.futureNote('2026-02-30', '2026-11-09'), '', 'تاريخ مش موجود');
+  const sameMonth = Fmt.futureNote('2026-11-20', '2026-11-09');
+  assert.match(sameMonth, /لسه مجاش/);
+  assert.match(sameMonth, /هيتحسب في إجمالي الشهر ده/);
+  const later = Fmt.futureNote('2027-01-15', '2026-11-09');
+  assert.match(later, /15 يناير 2027/);
+  assert.match(later, /هيظهر في يناير 2027 مش في إجمالي نوفمبر 2026/);
+});
+
+test('dayLabel: بكره', () => {
+  const t = new Date();
+  const tomorrow = new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1);
+  const iso = tomorrow.getFullYear() + '-' + String(tomorrow.getMonth() + 1).padStart(2, '0') + '-' + String(tomorrow.getDate()).padStart(2, '0');
+  assert.equal(Fmt.dayLabel(iso), 'بكره');
+});
+
 test('moneyNumber و amountForInput', () => {
   assert.equal(Fmt.moneyNumber(125075), '1,250.75');
   assert.equal(Fmt.moneyNumber(15000), '150');

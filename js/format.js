@@ -18,17 +18,27 @@ const Fmt = (function () {
       .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06F0));
   }
 
-  // بترجع المبلغ بالقرش، أو null لو مش رقم صحيح أكبر من صفر
-  function parseAmount(input) {
-    let t = normalizeDigits(input).trim()
+  // بترجع { piasters } أو { error } عشان الفورم يقول الغلط بالظبط:
+  // 'empty' | 'invalid' (مش رقم) | 'decimals' (أكتر من قرشين) | 'zero' | 'too-big'
+  function checkAmount(input) {
+    let t = normalizeDigits(input == null ? '' : input).trim()
       .replace(/٫/g, '.')          // الفاصلة العشرية العربية ٫
       .replace(/[,٬\s]/g, '');     // فواصل الآلاف
+    if (!t) return { error: 'empty' };
     if (t.startsWith('.')) t = '0' + t;
+    if (/^\d+\.\d{3,}$/.test(t)) return { error: 'decimals' };
     const m = /^(\d+)(?:\.(\d{0,2}))?$/.exec(t);
-    if (!m) return null;
+    if (!m) return { error: 'invalid' };
     const piasters = Number(m[1]) * 100 + Number(((m[2] || '') + '00').slice(0, 2));
-    if (!Number.isSafeInteger(piasters) || piasters <= 0 || piasters > MAX_PIASTERS) return null;
-    return piasters;
+    if (!Number.isSafeInteger(piasters) || piasters > MAX_PIASTERS) return { error: 'too-big' };
+    if (piasters <= 0) return { error: 'zero' };
+    return { piasters };
+  }
+
+  // بترجع المبلغ بالقرش، أو null لو فيه أي غلط
+  function parseAmount(input) {
+    const r = checkAmount(input);
+    return r.error ? null : r.piasters;
   }
 
   function moneyNumber(piasters) {
@@ -67,6 +77,24 @@ const Fmt = (function () {
     return toISO(new Date());
   }
 
+  // التواريخ YYYY-MM-DD بتتقارن كنص صح
+  function isFutureDate(iso, today) {
+    return iso > (today || todayISO());
+  }
+
+  // الجملة اللي تحت خانة التاريخ لو التاريخ لسه مجاش، أو '' لو مفيش تنبيه
+  function futureNote(iso, today) {
+    today = today || todayISO();
+    if (!isISODate(iso) || !isFutureDate(iso, today)) return '';
+    const ym = iso.slice(0, 7);
+    const current = today.slice(0, 7);
+    const day = dayLabel(iso);
+    return ym === current
+      ? '⚠️ التاريخ ده لسه مجاش (' + day + '). المصروف هيتحسب في إجمالي الشهر ده.'
+      : '⚠️ التاريخ ده لسه مجاش (' + day + '). المصروف هيتسجل عادي، بس هيظهر في '
+        + monthLabel(ym) + ' مش في إجمالي ' + monthLabel(current) + '.';
+  }
+
   function currentMonth() {
     return todayISO().slice(0, 7);
   }
@@ -76,6 +104,8 @@ const Fmt = (function () {
     if (iso === toISO(today)) return 'النهارده';
     const y = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
     if (iso === toISO(y)) return 'امبارح';
+    const t = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+    if (iso === toISO(t)) return 'بكره';
     const d = parseISO(iso);
     return (d.getFullYear() === today.getFullYear() ? dayFmt : dayYearFmt).format(d);
   }
@@ -102,12 +132,16 @@ const Fmt = (function () {
 
   return {
     normalizeDigits,
+    MAX_PIASTERS,
+    checkAmount,
     parseAmount,
     moneyNumber,
     compact,
     amountForInput,
     isISODate,
     todayISO,
+    isFutureDate,
+    futureNote,
     currentMonth,
     dayLabel,
     monthLabel,
