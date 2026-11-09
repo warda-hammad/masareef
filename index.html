@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>مصاريفي</title>
+  <meta name="description" content="تطبيق بسيط لتسجيل المصاريف بالجنيه المصري. البيانات بتفضل على الجهاز بس.">
+  <meta name="theme-color" content="#14121C">
+  <meta name="color-scheme" content="dark">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div id="storage-banner" class="banner" role="alert" hidden></div>
+
+  <main class="app">
+    <header class="app-header">
+      <p class="brand"><span class="brand-dot" aria-hidden="true"></span>مصاريفي</p>
+      <section class="month-card" aria-labelledby="month-label">
+        <h1 id="month-label" class="month-label">إجمالي الشهر</h1>
+        <p id="month-total" class="month-total"></p>
+        <p id="month-count" class="month-count"></p>
+      </section>
+    </header>
+
+    <section class="expenses" aria-labelledby="list-title">
+      <h2 id="list-title" class="section-title">المصاريف</h2>
+      <div id="empty-state" class="empty" hidden>
+        <p class="empty-icon" aria-hidden="true">🧾</p>
+        <p>لسه مفيش مصاريف متسجلة.</p>
+        <p class="empty-hint">زرار «+ مصروف» اللي تحت بيضيف أول واحد.</p>
+      </div>
+      <ol id="expense-list" class="days"></ol>
+    </section>
+
+    <footer class="privacy">
+      <p><span aria-hidden="true">🔒</span> بياناتك متخزنة على الجهاز ده بس، جوه المتصفح. مفيش سيرفر، ومفيش أي حاجة بتطلع من جهازك.</p>
+      <p class="privacy-note">خلي بالك: مسح بيانات المتصفح بيمسح المصاريف كمان.</p>
+    </footer>
+  </main>
+
+  <button id="add-btn" class="fab" type="button"><span aria-hidden="true">+</span> مصروف</button>
+
+  <div id="toast" class="toast" role="status" aria-live="polite">
+    <span id="toast-msg"></span>
+    <button id="toast-action" class="toast-action" type="button" hidden></button>
+  </div>
+
+  <dialog id="expense-dialog" class="sheet-dialog" aria-labelledby="dialog-title">
+    <form id="expense-form" class="sheet" novalidate>
+      <div class="sheet-head">
+        <h2 id="dialog-title">مصروف جديد</h2>
+        <button type="button" class="icon-btn" data-close aria-label="قفل">✕</button>
+      </div>
+
+      <label class="field" for="f-amount">
+        <span class="field-label">المبلغ</span>
+        <span class="amount-wrap">
+          <input id="f-amount" name="amount" class="amount-input num" inputmode="decimal"
+                 autocomplete="off" dir="ltr" placeholder="0" required>
+          <span class="cur">ج.م</span>
+        </span>
+      </label>
+
+      <fieldset class="field">
+        <legend class="field-label">الفئة</legend>
+        <div id="f-categories" class="chips"></div>
+      </fieldset>
+
+      <label class="field" for="f-date">
+        <span class="field-label">التاريخ</span>
+        <input id="f-date" name="date" type="date" class="input" required>
+      </label>
+
+      <label class="field" for="f-note">
+        <span class="field-label">ملاحظة <span class="optional">(اختياري)</span></span>
+        <input id="f-note" name="note" type="text" class="input" maxlength="140"
+               placeholder="مثلاً: فطار مع الشغل" autocomplete="off">
+      </label>
+
+      <p id="form-error" class="form-error" role="alert"></p>
+
+      <div class="sheet-actions">
+        <button type="submit" class="btn btn-primary">حفظ</button>
+        <button type="button" id="delete-btn" class="btn btn-danger" hidden>مسح</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="js/storage.js"></script>
+  <script src="js/format.js"></script>
+  <script src="js/expenses.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
