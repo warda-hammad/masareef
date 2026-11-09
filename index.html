@@ -107,6 +107,35 @@
 
     <section id="view-list" class="expenses" role="tabpanel" aria-labelledby="tab-list">
       <h2 id="list-title" class="section-title">المصاريف</h2>
+
+      <div id="filters" class="filters" role="search">
+        <label class="search-field" for="flt-q">
+          <span class="sr-only">بحث</span>
+          <span class="search-icon" aria-hidden="true">🔍</span>
+          <input id="flt-q" type="search" class="input search-input" maxlength="100"
+                 placeholder="بحث في الملاحظات والفئات" autocomplete="off">
+        </label>
+        <div class="filter-row">
+          <label for="flt-month">
+            <span class="sr-only">الشهر</span>
+            <select id="flt-month" class="input"></select>
+          </label>
+          <label for="flt-cat">
+            <span class="sr-only">الفئة</span>
+            <select id="flt-cat" class="input"></select>
+          </label>
+        </div>
+        <div id="filter-summary" class="filter-summary" hidden>
+          <p id="filter-result" aria-live="polite"></p>
+          <button id="filter-clear" class="link-btn" type="button">مسح الفلتر</button>
+        </div>
+      </div>
+
+      <div id="no-results" class="empty" hidden>
+        <p class="empty-icon" aria-hidden="true">🔎</p>
+        <p>مفيش مصاريف بتطابق الفلتر ده.</p>
+      </div>
+
       <div id="empty-state" class="empty" hidden>
         <p class="empty-icon" aria-hidden="true">🧾</p>
         <p>لسه مفيش مصاريف متسجلة.</p>
@@ -251,6 +280,7 @@
   <script src="js/categories.js"></script>
   <script src="js/budget.js"></script>
   <script src="js/stats.js"></script>
+  <script src="js/filters.js"></script>
   <script src="js/dom.js"></script>
   <script src="js/charts.js"></script>
   <script src="js/app.js"></script>

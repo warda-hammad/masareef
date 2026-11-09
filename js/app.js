@@ -74,6 +74,15 @@
     dayChart: $('#day-chart'),
     dayKey: $('#day-key'),
     dayTable: $('#day-table'),
+
+    filtersBox: $('#filters'),
+    fltQ: $('#flt-q'),
+    fltMonth: $('#flt-month'),
+    fltCat: $('#flt-cat'),
+    filterSummary: $('#filter-summary'),
+    filterResult: $('#filter-result'),
+    filterClear: $('#filter-clear'),
+    noResults: $('#no-results'),
   };
 
   const BANNERS = {
@@ -97,6 +106,7 @@
   let catFromExpenseForm = false; // الفئة اتفتحت من زرار "+ فئة" جوه فورم المصروف
   let toastTimer = null;
   let view = location.hash === '#dashboard' ? 'dash' : 'list';
+  let filter = view === 'list' ? Filters.parse(location.hash) : Filters.clean();
   let dashMonth = Fmt.currentMonth();
   let dayChartWidth = 0;
 
@@ -116,9 +126,7 @@
     els.monthCount.textContent = Fmt.countLabel(monthItems.length);
     renderBudget(Budget.status(ym));
 
-    const groups = Expenses.groupByDay(Expenses.all());
-    els.empty.hidden = groups.length > 0;
-    els.list.replaceChildren(...groups.map(dayEl));
+    renderList();
 
     if (els.catsDialog.open) renderCategoryList();
     if (view === 'dash') renderDashboard();
@@ -136,7 +144,7 @@
       tab.tabIndex = on ? 0 : -1;
     });
     if (focus) (dash ? els.tabDash : els.tabList).focus();
-    history.replaceState(null, '', dash ? '#dashboard' : location.pathname + location.search);
+    syncHash();
     Charts.hideTip();
     if (dash) renderDashboard();
   }
@@ -214,6 +222,61 @@
     dashMonth = Stats.shiftMonth(dashMonth, n);
     Charts.hideTip();
     renderDashboard();
+  }
+
+  /* ---------- اللستة والفلتر ---------- */
+
+  function renderList() {
+    const all = Expenses.all();
+    // لو الفئة المختارة في الفلتر اتمسحت، نرجع لكل الفئات
+    if (filter.cat && !Categories.find(filter.cat)) {
+      filter.cat = '';
+      syncHash();
+    }
+    renderFilterControls();
+
+    const shown = Filters.apply(all, filter);
+    const active = Filters.isActive(filter);
+    els.filtersBox.hidden = all.length === 0;
+    els.empty.hidden = all.length > 0;
+    els.noResults.hidden = !(all.length && active && !shown.length);
+    els.filterSummary.hidden = !active;
+    if (active) {
+      els.filterResult.replaceChildren(shown.length
+        ? Fmt.countLabel(shown.length) + ' · '
+        : 'مفيش نتايج', ...(shown.length ? [moneyEl(Expenses.total(shown))] : []));
+    }
+    els.list.replaceChildren(...Expenses.groupByDay(shown).map(dayEl));
+  }
+
+  function option(value, text, selected) {
+    const o = el('option', '', text);
+    o.value = value;
+    o.selected = value === selected;
+    return o;
+  }
+
+  function renderFilterControls() {
+    const months = Filters.monthOptions(Stats.monthRange(Fmt.todayISO()), filter.month);
+    els.fltMonth.replaceChildren(option('', 'كل الشهور', filter.month),
+      ...months.map((ym) => option(ym, Fmt.monthLabel(ym), filter.month)));
+    els.fltCat.replaceChildren(option('', 'كل الفئات', filter.cat),
+      ...Categories.all().map((c) => option(c.id, c.name, filter.cat)));
+    // منلمسش خانة البحث وهي بتتكتب فيها، عشان مكان المؤشر ميتغيرش
+    if (els.fltQ.value !== filter.q) els.fltQ.value = filter.q;
+  }
+
+  function syncHash() {
+    let hash = '';
+    if (view === 'dash') hash = 'dashboard';
+    else hash = Filters.serialize(filter);
+    history.replaceState(null, '', hash ? '#' + hash : location.pathname + location.search);
+  }
+
+  function updateFilter(patch) {
+    filter = Filters.clean(Object.assign({}, filter, patch));
+    syncHash();
+    renderList();
   }
 
   function dayEl(group) {
@@ -371,6 +434,12 @@
     const level = Budget.crossed(before, after);
     if (level) {
       toast(budgetWarning(level, after, ym), { tone: level, duration: 5000 });
+    } else if (Filters.isActive(filter) && !Filters.matches(saved, filter)) {
+      toast((wasEdit ? 'اتعدّل المصروف' : 'اتضاف المصروف') + '، بس مش باين بسبب الفلتر', {
+        action: 'مسح الفلتر',
+        duration: 5000,
+        onAction: clearFilter,
+      });
     } else {
       toast(wasEdit ? 'اتعدّل المصروف' : 'اتضاف المصروف');
     }
@@ -628,6 +697,24 @@
     ev.preventDefault();
     setView(view === 'dash' ? 'list' : 'dash', true);
   }));
+  function clearFilter() {
+    updateFilter(Filters.EMPTY);
+    els.fltQ.focus();
+  }
+
+  els.fltQ.addEventListener('input', () => updateFilter({ q: els.fltQ.value }));
+  els.fltMonth.addEventListener('change', () => updateFilter({ month: els.fltMonth.value }));
+  els.fltCat.addEventListener('change', () => updateFilter({ cat: els.fltCat.value }));
+  els.filterClear.addEventListener('click', clearFilter);
+
+  // لو الرابط اتغير بإيد اليوزر أو بزرار الرجوع
+  window.addEventListener('hashchange', () => {
+    if (location.hash === '#dashboard') return setView('dash');
+    filter = Filters.parse(location.hash);
+    if (view !== 'list') setView('list');
+    else renderList();
+  });
+
   els.dashPrev.addEventListener('click', () => moveMonth(-1));
   els.dashNext.addEventListener('click', () => moveMonth(1));
 
