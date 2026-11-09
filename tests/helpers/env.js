@@ -5,7 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const JS_DIR = path.join(__dirname, '..', '..', 'js');
-const LOGIC_FILES = ['storage.js', 'format.js', 'expenses.js', 'categories.js', 'budget.js', 'stats.js', 'filters.js'];
+const LOGIC_FILES = ['storage.js', 'format.js', 'expenses.js', 'categories.js', 'budget.js', 'stats.js', 'filters.js', 'csv.js'];
 const KEY = 'masareef.v1';
 
 function createApp(initialStorage = {}) {
@@ -15,11 +15,11 @@ function createApp(initialStorage = {}) {
     setItem: (k, v) => { mem[k] = String(v); },
     removeItem: (k) => { delete mem[k]; },
   };
-  const ctx = vm.createContext({ crypto: globalThis.crypto, Intl, console, localStorage });
+  const ctx = vm.createContext({ crypto: globalThis.crypto, Intl, console, localStorage, TextDecoder });
   for (const f of LOGIC_FILES) {
     vm.runInContext(fs.readFileSync(path.join(JS_DIR, f), 'utf8'), ctx, { filename: f });
   }
-  const api = vm.runInContext('({ Store, Fmt, Expenses, Categories, Budget, Stats, Filters })', ctx);
+  const api = vm.runInContext('({ Store, Fmt, Expenses, Categories, Budget, Stats, Filters, Csv })', ctx);
   api.Store.load();
 
   return Object.assign(api, {

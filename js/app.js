@@ -83,6 +83,26 @@
     filterResult: $('#filter-result'),
     filterClear: $('#filter-clear'),
     noResults: $('#no-results'),
+
+    openData: $('#open-data'),
+    dataDialog: $('#data-dialog'),
+    exportBtn: $('#export-btn'),
+    exportHint: $('#export-hint'),
+    importBtn: $('#import-btn'),
+    importFile: $('#import-file'),
+    dataError: $('#data-error'),
+    importDialog: $('#import-dialog'),
+    importForm: $('#import-form'),
+    impSummary: $('#imp-summary'),
+    impNotes: $('#imp-notes'),
+    impErrorsBox: $('#imp-errors-box'),
+    impErrorsTitle: $('#imp-errors-title'),
+    impErrors: $('#imp-errors'),
+    impCaption: $('#imp-caption'),
+    impPreview: $('#imp-preview'),
+    impWarning: $('#imp-warning'),
+    impError: $('#imp-error'),
+    impConfirm: $('#imp-confirm'),
   };
 
   const BANNERS = {
@@ -639,6 +659,165 @@
     });
   }
 
+  /* ---------- تصدير واستيراد CSV ---------- */
+
+  const MAX_FILE_BYTES = 5 * 1024 * 1024;
+  const PREVIEW_ROWS = 5;
+  const MAX_LISTED_ERRORS = 50;
+
+  const FILE_ERRORS = {
+    empty: 'الملف فاضي.',
+    header: 'مش لاقيين عمود التاريخ أو المبلغ في أول سطر. أول سطر لازم يكون زي: date,amount,category,note',
+    'too-many': 'الملف فيه أكتر من ' + Fmt.moneyNumber(Csv.MAX_ROWS * 100) + ' صف.',
+    big: 'الملف كبير قوي (الحد الأقصى 5 ميجا).',
+    read: 'مقدرناش نقرا الملف.',
+  };
+
+  const ROW_ERRORS = {
+    date: 'التاريخ مش مفهوم',
+    amount: 'المبلغ مش رقم صحيح أكبر من صفر',
+  };
+
+  let pendingImport = null;
+
+  function openData() {
+    const has = Expenses.all().length > 0;
+    els.exportBtn.disabled = !has;
+    els.exportHint.hidden = has;
+    els.dataError.textContent = '';
+    els.dataDialog.showModal();
+  }
+
+  function onExport() {
+    const all = Expenses.all();
+    if (!all.length) return;
+    const blob = new Blob([Csv.exportText(all)], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = el('a');
+    a.href = url;
+    a.download = 'masareef-' + Fmt.todayISO() + '.csv';
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast('اتصدّر ملف فيه ' + Fmt.countLabel(all.length));
+  }
+
+  function onImportFile() {
+    const file = els.importFile.files[0];
+    els.importFile.value = ''; // عشان نفس الملف يتختار تاني لو اتعدل
+    if (!file) return;
+    els.dataError.textContent = '';
+    if (file.size > MAX_FILE_BYTES) {
+      els.dataError.textContent = FILE_ERRORS.big;
+      return;
+    }
+    file.arrayBuffer().then((buf) => {
+      const analysis = Csv.analyze(Csv.decode(new Uint8Array(buf)));
+      if (analysis.error) {
+        els.dataError.textContent = FILE_ERRORS[analysis.error];
+        return;
+      }
+      pendingImport = analysis;
+      els.dataDialog.close();
+      showImportPreview(analysis);
+    }, () => {
+      els.dataError.textContent = FILE_ERRORS.read;
+    });
+  }
+
+  function showImportPreview(a) {
+    els.impSummary.replaceChildren(
+      'الصفوف في الملف: ', el('strong', 'num', String(a.total)),
+      ' · سليمة: ', el('strong', 'num', String(a.rows.length)),
+      ...(a.errors.length ? [' · فيها مشاكل: ', el('strong', 'num', String(a.errors.length))] : []));
+
+    els.impErrorsBox.hidden = !a.errors.length;
+    els.impErrorsBox.open = a.rows.length === 0;
+    els.impErrorsTitle.textContent = 'الصفوف اللي فيها مشاكل وهتتساب (' + a.errors.length + ')';
+    const listed = a.errors.slice(0, MAX_LISTED_ERRORS).map((e) =>
+      el('li', '', 'سطر ' + e.line + ': ' + ROW_ERRORS[e.code] + (e.value ? ' («' + e.value + '»)' : '')));
+    if (a.errors.length > MAX_LISTED_ERRORS) {
+      listed.push(el('li', 'hint', 'و' + (a.errors.length - MAX_LISTED_ERRORS) + ' غيرهم.'));
+    }
+    els.impErrors.replaceChildren(...listed);
+
+    const preview = a.rows.slice(0, PREVIEW_ROWS);
+    els.impCaption.textContent = preview.length
+      ? (a.rows.length > PREVIEW_ROWS ? 'أول ' + PREVIEW_ROWS + ' صفوف من ' + a.rows.length : 'كل الصفوف')
+      : 'مفيش صفوف سليمة في الملف.';
+    els.impPreview.replaceChildren(...preview.map((r) => {
+      const tr = el('tr');
+      const amount = el('td');
+      amount.append(moneyEl(r.amount));
+      const cat = el('td', '', r.categoryId ? Store.category(r.categoryId).name : r.categoryName);
+      if (!r.categoryId) cat.append(' ', el('span', 'tag', 'جديدة'));
+      tr.append(el('td', 'num', r.date), amount, cat, el('td', 'imp-note', r.note));
+      return tr;
+    }));
+
+    els.importForm.querySelector('input[value="merge"]').checked = true;
+    els.impError.textContent = '';
+    updateImportMode();
+    els.importDialog.showModal();
+  }
+
+  function importMode() {
+    return els.importForm.querySelector('input[name="mode"]:checked').value;
+  }
+
+  function updateImportMode() {
+    const a = pendingImport;
+    if (!a) return;
+    const mode = importMode();
+    const dups = mode === 'merge' ? Csv.countDuplicates(a.rows) : 0;
+    const count = a.rows.length - dups;
+
+    const notes = [];
+    if (a.newCategories.length) notes.push('هيتعمل فئات جديدة: ' + a.newCategories.join('، '));
+    if (dups === 1) notes.push('فيه مصروف واحد في الملف موجود قبل كده، فهيتساب.');
+    else if (dups) notes.push(Fmt.countLabel(dups) + ' في الملف موجودين قبل كده، فهيتسابوا.');
+    els.impNotes.replaceChildren(...notes.map((t) => el('li', '', t)));
+
+    const existing = Expenses.all().length;
+    els.impWarning.hidden = !(mode === 'replace' && existing);
+    els.impWarning.textContent = '⚠️ كل المصاريف الموجودة دلوقتي هتتمسح (' + Fmt.countLabel(existing)
+      + '). بعد الاستيراد «تراجع» بيفضل 5 ثواني بس، فالأحسن تصدير نسخة احتياطية الأول.';
+
+    els.impConfirm.disabled = count === 0;
+    els.impConfirm.textContent = count === 0
+      ? 'مفيش جديد للاستيراد'
+      : (mode === 'replace' ? 'استبدال بـ ' : 'استيراد ') + Fmt.countLabel(count);  }
+
+  function onImportConfirm(ev) {
+    ev.preventDefault();
+    const mode = importMode();
+    const result = Csv.apply(pendingImport, mode);
+    if (!result) {
+      els.impError.textContent = SAVE_FAILED;
+      return;
+    }
+    pendingImport = null;
+    els.importDialog.close();
+    render();
+
+    const parts = [(mode === 'replace' ? 'اتستبدلت المصاريف بـ ' : 'اتضاف ') + Fmt.countLabel(result.added)];
+    const n = result.categoriesAdded;
+    if (n) parts.push(n === 1 ? 'وفئة جديدة' : n === 2 ? 'وفئتين جداد' : 'و' + n + (n <= 10 ? ' فئات جديدة' : ' فئة جديدة'));
+    toast(parts.join(' '), {
+      action: 'تراجع',
+      duration: 5000,
+      onAction: () => {
+        if (Csv.undo(result.snapshot)) {
+          render();
+          toast('رجعت البيانات زي ما كانت');
+        } else {
+          toast('مقدرناش نرجّع البيانات');
+        }
+      },
+    });
+  }
+
   /* ---------- التوست ---------- */
 
   // tone: 'warn' أو 'over' لتوست التحذير
@@ -688,6 +867,15 @@
   els.editBudget.addEventListener('click', openBudgetForm);
   els.budgetForm.addEventListener('submit', onBudgetSubmit);
   els.budgetClear.addEventListener('click', onBudgetClear);
+  els.openData.addEventListener('click', openData);
+  els.exportBtn.addEventListener('click', onExport);
+  els.importBtn.addEventListener('click', () => els.importFile.click());
+  els.importFile.addEventListener('change', onImportFile);
+  els.importForm.addEventListener('change', (ev) => {
+    if (ev.target.name === 'mode') updateImportMode();
+  });
+  els.importForm.addEventListener('submit', onImportConfirm);
+  els.importDialog.addEventListener('close', () => { pendingImport = null; });
 
   els.tabList.addEventListener('click', () => setView('list'));
   els.tabDash.addEventListener('click', () => setView('dash'));

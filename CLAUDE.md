@@ -17,13 +17,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Run all: `node --test` from the repo root (Node's built-in runner; it picks up `tests/*.test.js`).
 - Run one file: `node --test tests/categories.test.js`
 - Run one test by name: `node --test --test-name-pattern="restore"`. Don't pass a bare directory like `tests/`: Node 24 treats it as a file and fails.
-- `tests/helpers/env.js` → `createApp(initialStorage)` loads the DOM-free logic files (`LOGIC_FILES`, in `index.html` order) into a fresh `vm` context with a fake `localStorage`. It returns `{Store, Fmt, Expenses, Categories, Budget, Stats, Filters, mem, saved(), failWrites(), blockStorage()}`. When a new logic file is added, add it to `LOGIC_FILES`.
+- `tests/helpers/env.js` → `createApp(initialStorage)` loads the DOM-free logic files (`LOGIC_FILES`, in `index.html` order) into a fresh `vm` context with a fake `localStorage` (and the host `TextDecoder`). It returns `{Store, Fmt, Expenses, Categories, Budget, Stats, Filters, Csv, mem, saved(), failWrites(), blockStorage()}`. When a new logic file is added, add it to `LOGIC_FILES`.
 - Objects coming out of the vm have foreign prototypes, so wrap them in `plain()` before `deepEqual`.
 - Every roadmap step adds its tests here. `app.js` (the DOM layer) isn't unit-tested; check it in a real browser.
 
 ## Architecture
 
-- **Classic scripts, no ES modules.** Modules break under `file://`. `index.html` loads the scripts in dependency order: `storage.js` → `format.js` → `expenses.js` → `categories.js` → `budget.js` → `stats.js` → `filters.js` → `dom.js` → `charts.js` → `app.js`. Each file before `app.js` defines one global object (`Store`, `Fmt`, `Expenses`, `Categories`, `Budget`, `Stats`, `Filters`, `Dom`, `Charts`) via an IIFE. The first seven are DOM-free logic and are what the tests load. `dom.js` (shared `el`/`moneyEl`/`badgeEl`), `charts.js` and `app.js` are the DOM layer. New modules follow the same pattern and must be added to the script list in order.
+- **Classic scripts, no ES modules.** Modules break under `file://`. `index.html` loads the scripts in dependency order: `storage.js` → `format.js` → `expenses.js` → `categories.js` → `budget.js` → `stats.js` → `filters.js` → `csv.js` → `dom.js` → `charts.js` → `app.js`. Each file before `app.js` defines one global object (`Store`, `Fmt`, `Expenses`, `Categories`, `Budget`, `Stats`, `Filters`, `Csv`, `Dom`, `Charts`) via an IIFE. The first eight are DOM-free logic and are what the tests load. `dom.js` (shared `el`/`moneyEl`/`badgeEl`), `charts.js` and `app.js` are the DOM layer. New modules follow the same pattern and must be added to the script list in order.
 - **Single state object.** `Store` holds `{version, expenses[], categories[], settings{}}` under the key `masareef.v1`. Shape changes go through `migrate()` in `storage.js`, and `VERSION` gets bumped. Corrupt JSON is copied to `masareef.v1.corrupt.<ts>` instead of being overwritten. If that copy fails, or storage is unavailable, `persist` goes false: the app runs memory-only and shows a banner. `Store.error()` drives that banner.
 - **Mutate-then-save with rollback.** Every write goes through `Store.commit(apply, revert)`: it applies the change in memory, saves, and runs `revert` if the save fails (for example on quota errors). Writes return `null`/`false` on failure so the UI can show an error. New data operations (like CSV import) should use `Store.commit` too. IDs come from `Store.newId()`.
 - **Undo via snapshots.** `Expenses.remove` returns the removed expense, `Categories.remove` returns `{category, index, movedIds, movedTo}`, and clearing the budget keeps the old amount for `Budget.set`. The UI passes that back to `restore()` from the toast's «تراجع» button.
@@ -43,6 +43,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - The day axis is mirrored for RTL (day 1 on the right).
   - Every chart has hover/tap tooltips (`Charts.bindTip`) and an «عرض كجدول» table.
   - Percent strings get a leading `‎` (LRM) so «68%» isn't flipped to «%68» after Arabic text.
+- **CSV.**
+  - Export is `date,amount,category,note` with a UTF-8 BOM and CRLF line endings. The category is written by name, and the amount in pounds via `Fmt.amountForInput`. Text fields starting with `= + - @` get a leading `'` against formula injection, and import strips it again.
+  - Import happens in two steps. `Csv.analyze(text)` only reads: it returns `{rows, errors:[{line, code, value}], newCategories, total}` or `{error}`. Then `Csv.apply(analysis, 'merge'|'replace')` runs one `Store.commit` and returns a `snapshot` that `Csv.undo()` takes.
+  - Replace swaps expenses only; categories are kept. Merge skips rows matching an existing expense on (date, amount, categoryId, note), and each existing copy cancels at most one row.
+  - What the importer accepts:
+    - UTF-8, or Windows-1256 as a fallback (`Csv.decode`), which is what Arabic Excel writes for plain CSV
+    - `,` `;` or tab as the delimiter, auto-detected from the header
+    - Arabic or English headers, in any order
+    - dates as `YYYY-MM-DD` or day-first `D/M/YYYY`
+    - amounts with `ج.م` or with thousands separators
+  - Category names match existing ones through `Filters.normalize`. Unknown names become new palette-colored categories.
 - **Dates are local `YYYY-MM-DD` strings.** Never use `new Date('YYYY-MM-DD')`, because it parses as UTC. Use the `Fmt` helpers.
 - **Categories.**
   - The built-in categories have stable ids (`food`, `transport`, `bills`, `rent`, `health`, `outings`, `other`) and `builtIn: true`. They can be renamed and recolored but never deleted.
@@ -70,7 +81,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 3. Monthly budget with warnings (done)
 4. Dashboard with charts (done)
 5. Search and filters (done)
-6. CSV export (UTF-8 BOM, `date,amount,category,note`) and import with preview and merge/replace
+6. CSV export and import (done)
 7. PWA: `manifest.webmanifest`, icons, cache-first `sw.js`
 8. Accessibility pass, privacy page, "delete all my data", deploy README
 

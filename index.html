@@ -16,9 +16,14 @@
     <header class="app-header">
       <div class="top-bar">
         <p class="brand"><span class="brand-dot" aria-hidden="true"></span>مصاريفي</p>
-        <button id="open-categories" class="ghost-btn" type="button">
-          <span aria-hidden="true">🏷️</span> الفئات
-        </button>
+        <div class="top-actions">
+          <button id="open-categories" class="ghost-btn" type="button">
+            <span aria-hidden="true">🏷️</span> الفئات
+          </button>
+          <button id="open-data" class="ghost-btn" type="button">
+            <span aria-hidden="true">📁</span> البيانات
+          </button>
+        </div>
       </div>
       <section class="month-card" aria-labelledby="month-label">
         <h1 id="month-label" class="month-label">إجمالي الشهر</h1>
@@ -274,6 +279,76 @@
     </form>
   </dialog>
 
+  <dialog id="data-dialog" class="sheet-dialog" aria-labelledby="data-title">
+    <div class="sheet">
+      <div class="sheet-head">
+        <h2 id="data-title">البيانات</h2>
+        <button type="button" class="icon-btn" data-close aria-label="قفل">✕</button>
+      </div>
+
+      <p class="hint">الملف بيتعمل ويتقري هنا على الجهاز. مفيش أي حاجة بتترفع على سيرفر.</p>
+
+      <div class="data-actions">
+        <button id="export-btn" type="button" class="btn btn-secondary">⬇️ تصدير CSV</button>
+        <button id="import-btn" type="button" class="btn btn-secondary">⬆️ استيراد CSV</button>
+        <input id="import-file" type="file" accept=".csv,text/csv" hidden>
+      </div>
+      <p id="export-hint" class="hint" hidden>مفيش مصاريف لسه عشان تتصدّر.</p>
+
+      <details class="chart-table">
+        <summary>شكل الملف المطلوب</summary>
+        <p class="hint">أول سطر فيه أسامي الأعمدة: <span class="num" dir="ltr">date,amount,category,note</span> (أو بالعربي: التاريخ، المبلغ، الفئة، الملاحظة). التاريخ والمبلغ لازم يكونوا موجودين.</p>
+        <p class="hint">التاريخ يتكتب <span class="num" dir="ltr">2026-11-09</span> أو <span class="num" dir="ltr">9/11/2026</span> (اليوم الأول). الفئة اللي مش موجودة بتتعمل لوحدها.</p>
+      </details>
+
+      <p id="data-error" class="form-error" role="alert"></p>
+    </div>
+  </dialog>
+
+  <dialog id="import-dialog" class="sheet-dialog" aria-labelledby="import-title">
+    <form id="import-form" class="sheet" novalidate>
+      <div class="sheet-head">
+        <h2 id="import-title">مراجعة الاستيراد</h2>
+        <button type="button" class="icon-btn" data-close aria-label="قفل">✕</button>
+      </div>
+
+      <p id="imp-summary" class="imp-summary"></p>
+      <ul id="imp-notes" class="imp-notes"></ul>
+
+      <details id="imp-errors-box" class="imp-errors-box">
+        <summary id="imp-errors-title"></summary>
+        <ul id="imp-errors" class="imp-errors"></ul>
+      </details>
+
+      <div class="table-scroll">
+        <table class="imp-table">
+          <caption id="imp-caption" class="hint"></caption>
+          <thead><tr><th scope="col">التاريخ</th><th scope="col">المبلغ</th><th scope="col">الفئة</th><th scope="col">الملاحظة</th></tr></thead>
+          <tbody id="imp-preview"></tbody>
+        </table>
+      </div>
+
+      <fieldset class="field">
+        <legend class="field-label">طريقة الاستيراد</legend>
+        <label class="radio-row">
+          <input type="radio" name="mode" value="merge" checked>
+          <span><strong>دمج</strong>: المصاريف اللي في الملف تتضاف للموجودة، واللي متكرر بيتساب.</span>
+        </label>
+        <label class="radio-row">
+          <input type="radio" name="mode" value="replace">
+          <span><strong>استبدال</strong>: المصاريف الموجودة تتمسح، وتتحط مكانها اللي في الملف.</span>
+        </label>
+      </fieldset>
+
+      <p id="imp-warning" class="warn-box" hidden></p>
+      <p id="imp-error" class="form-error" role="alert"></p>
+
+      <div class="sheet-actions">
+        <button type="submit" id="imp-confirm" class="btn btn-primary"></button>
+      </div>
+    </form>
+  </dialog>
+
   <script src="js/storage.js"></script>
   <script src="js/format.js"></script>
   <script src="js/expenses.js"></script>
@@ -281,6 +356,7 @@
   <script src="js/budget.js"></script>
   <script src="js/stats.js"></script>
   <script src="js/filters.js"></script>
+  <script src="js/csv.js"></script>
   <script src="js/dom.js"></script>
   <script src="js/charts.js"></script>
   <script src="js/app.js"></script>
